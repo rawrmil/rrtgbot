@@ -2,6 +2,7 @@
 #define TGBOT_RW_H
 
 #include "binary_rw.h"
+#include "cJSON/cJSON.h"
 
 #define TGBOT_API_HOST "api.telegram.org"
 #define TGBOT_API_URL "https://"TGBOT_API_HOST"/"

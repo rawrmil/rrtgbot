@@ -23,9 +23,10 @@ int main(int argc, char** argv) {
 		if (!cmd_run(&cmd)) return 1;
 	}
 
-	cmd_append(&cmd, "cc", "main.c", "-o", "out/rrtgbot");
-	cmd_append(&cmd, "out/mongoose.o");
-	cmd_append(&cmd, "-I./3rd_party");
+	cmd_append(&cmd,
+			"cc", "main.c", "3rd_party/cJSON/cJSON.c", "-o", "out/rrtgbot",
+			"out/mongoose.o",
+			"-I./3rd_party");
 	if (!cmd_run(&cmd)) return 1;
 
 	return 0;
