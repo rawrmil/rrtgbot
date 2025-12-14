@@ -14,6 +14,10 @@
 #include "flag.h"
 #undef FLAG_IMPLEMENTATION
 
+#define BINARY_RW_IMPLEMENTATION
+#include "binary_rw.h"
+#undef BINARY_RW_IMPLEMENTATION
+
 #include "credentials.h" /* Created by user */
 
 #define TGBOT_IMPLEMENTATION
@@ -67,11 +71,17 @@ void app_terminate(int sig) { is_working = 0; }
 int main(int argc, char* argv[]) {
 	FlagsParse(argc, argv);
 
+	NOB_ASSERT(nob_mkdir_if_not_exists("dbs"));
+
 	printf("log_level: %d\n", mg_log_level);
 
 	struct mg_mgr mgr;
 	mg_mgr_init(&mgr);
 	TGBotConnect(&mgr);
+
+	//printf("tgb_update_offset=%lu\n", tgb_update_offset);
+	//tgb_update_offset = 5555;
+	//printf("tgb_update_offset=%lu\n", tgb_update_offset);
 
 	signal(SIGINT, app_terminate);
 	signal(SIGTERM, app_terminate);
@@ -83,6 +93,7 @@ int main(int argc, char* argv[]) {
 	// Closing
 	mg_mgr_free(&mgr);
 	printf("Server closed.\n");
+	TGBotClose();
 
 	return 0;
 }

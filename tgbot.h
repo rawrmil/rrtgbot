@@ -1,17 +1,21 @@
 #ifndef TGBOT_RW_H
 #define TGBOT_RW_H
 
+#include "binary_rw.h"
+
 #define TGBOT_API_HOST "api.telegram.org"
 #define TGBOT_API_URL "https://"TGBOT_API_HOST"/"
 
 void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data);
-struct mg_connection* TGBotConnect(struct mg_mgr* mgr);
+void TGBotConnect(struct mg_mgr* mgr);
 void TGBotGet(struct mg_connection* c, char* action);
 void TGBotPost(struct mg_connection* c, char* action, char* content_type, char* buf, size_t len);
 void TGBotPoll();
+void TGBotClose();
 
 extern struct mg_connection* tgb_conn;
 extern uint64_t tgb_last_poll_ms;
+extern uint64_t tgb_update_offset;
 
 #endif /* TGBOT_RW_H */
 
@@ -19,8 +23,17 @@ extern uint64_t tgb_last_poll_ms;
 
 struct mg_connection* tgb_conn;
 uint64_t tgb_last_poll_ms;
+uint64_t tgb_update_offset;
 
-struct mg_connection* TGBotConnect(struct mg_mgr* mgr) {
+void TGBotConnect(struct mg_mgr* mgr) {
+	Nob_String_Builder sb = {0};
+	BReader br = {0};
+	if (nob_file_exists("dbs/tgb_update_offset")) {
+		NOB_ASSERT(nob_read_entire_file("dbs/tgb_update_offset", &sb));
+		br.data = sb.items;
+		br.count = sb.count;
+		NOB_ASSERT(BReadU64(&br, &tgb_update_offset));
+	}
 	tgb_conn = mg_http_connect(mgr, TGBOT_API_URL, TGBotEventHandler, NULL);
 }
 
@@ -76,6 +89,12 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 			MG_INFO(("TGBOT: ERROR '%s'\n", ev_data));
 			break;
 	}
+}
+
+void TGBotClose() {
+	bw_temp.count = 0;
+	BWriteU64(&bw_temp, tgb_update_offset);
+	nob_write_entire_file("dbs/tgb_update_offset", bw_temp.items, bw_temp.count);
 }
 
 #endif /* TGBOT_IMPLEMENTATION */
