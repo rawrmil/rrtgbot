@@ -64,9 +64,13 @@ void FlagsParse(int argc, char** argv) {
 
 // --- MAIN ---
 
-char is_working = 1;
+bool is_closed;
+uint64_t started_closing;
 
-void app_terminate(int sig) { is_working = 0; }
+void app_terminate(int sig) {
+	TGBotSendText(TGBOT_ADMIN_CHAT_ID, "Server closed.");
+	started_closing = mg_millis();
+}
 
 int main(int argc, char* argv[]) {
 	FlagsParse(argc, argv);
@@ -85,9 +89,14 @@ int main(int argc, char* argv[]) {
 
 	signal(SIGINT, app_terminate);
 	signal(SIGTERM, app_terminate);
-	while (is_working) {
-		mg_mgr_poll(&mgr, 1000);
+	while (!is_closed) {
+		mg_mgr_poll(&mgr, 200);
 		TGBotPoll();
+		uint64_t now = mg_millis();
+		if (started_closing != 0 && now - started_closing > 400) {
+			MG_INFO(("TGBOT: POLL\n"));
+			is_closed = true;
+		}
 	}
 
 	// Closing

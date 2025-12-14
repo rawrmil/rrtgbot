@@ -7,6 +7,8 @@
 #define TGBOT_API_HOST "api.telegram.org"
 #define TGBOT_API_URL "https://"TGBOT_API_HOST"/"
 
+void TGBotSendText(uint64_t chat_id, char* text);
+
 void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data);
 void TGBotConnect(struct mg_mgr* mgr);
 void TGBotGet(struct mg_connection* c, char* action);
@@ -68,6 +70,16 @@ void TGBotPoll() {
 	}
 }
 
+void TGBotSendText(uint64_t chat_id, char* text) {
+	cJSON *msg_json = cJSON_CreateObject();
+	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", chat_id)));
+	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", text));
+	char* msg_str = cJSON_PrintUnformatted(msg_json);
+	TGBotPost(tgb_conn, "sendMessage", "application/json", msg_str, strlen(msg_str));
+	free(msg_str);
+	nob_temp_reset();
+}
+
 void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 	switch (ev) {
 		case MG_EV_CONNECT:
@@ -78,7 +90,8 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 			break;
 		case MG_EV_TLS_HS:
 			MG_INFO(("TGBOT: HANDSHAKE\n"));
-			TGBotGet(c, "getMe");
+			//TGBotGet(c, "getMe");
+			TGBotSendText(TGBOT_ADMIN_CHAT_ID, "Server started.");
 			break;
 		case MG_EV_HTTP_MSG:
 			MG_INFO(("TGBOT: MSG\n"));
