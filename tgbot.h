@@ -102,7 +102,16 @@ void TGBotHandleUpdate(cJSON* update) {
 	cJSON* text_json = cJSON_GetObjectItemCaseSensitive(message_json, "text");
 	if (!cJSON_IsString(text_json)) { return; }
 	char* text = text_json->valuestring;
-	printf("%d: '%s'\n", update_id, text);
+
+	cJSON* chat_json = cJSON_GetObjectItemCaseSensitive(message_json, "chat");
+	if (!cJSON_IsObject(chat_json)) { return; }
+	cJSON* chat_id_json = cJSON_GetObjectItemCaseSensitive(chat_json, "id");
+	if (!cJSON_IsNumber(chat_id_json)) { return; }
+	int chat_id = chat_id_json->valueint;
+
+	TGBotSendText(chat_id, text); // Echo
+
+	MG_INFO(("%d: '%s'\n", update_id, text));
 }
 
 void TGBotHandleHTTPMessage(void* ev_data) {
