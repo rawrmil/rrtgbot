@@ -11,7 +11,7 @@ void TGBotSendText(uint64_t chat_id, char* text);
 
 void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data);
 void TGBotConnect(struct mg_mgr* mgr);
-void TGBotGet(struct mg_connection* c, char* action);
+void TGBotGet(struct mg_connection* c, char* action, char* content_type, char* buf, size_t len);
 void TGBotPost(struct mg_connection* c, char* action, char* content_type, char* buf, size_t len);
 void TGBotPoll();
 void TGBotClose();
@@ -40,12 +40,17 @@ void TGBotConnect(struct mg_mgr* mgr) {
 	tgb_conn = mg_http_connect(mgr, TGBOT_API_URL, TGBotEventHandler, NULL);
 }
 
-void TGBotGet(struct mg_connection* c, char* action) {
-	mg_printf(c,
+void TGBotGet(struct mg_connection* c, char* action, char* content_type, char* buf, size_t len) {
+	char* msg = nob_temp_sprintf(
 			"GET /bot"TGBOT_API_TOKEN"/%s HTTP/1.1\r\n"
 			"Host: "TGBOT_API_HOST"\r\n"
 			"Connection: keep-alive\r\n"
-			"\r\n", action);
+			"Content-Type: %s\r\n"
+			"Content-Length: %zu\r\n"
+			"\r\n"
+			"%.*s", action, content_type, len, len, buf);
+	mg_send(c, msg, strlen(msg));
+	nob_temp_reset();
 }
 
 void TGBotPost(struct mg_connection* c, char* action, char* content_type, char* buf, size_t len) {
@@ -65,7 +70,12 @@ void TGBotPoll() {
 	uint64_t now = mg_millis();
 	if (now - tgb_last_poll_ms > 1000) {
 		MG_INFO(("TGBOT: POLL\n"));
-		TGBotGet(tgb_conn, "getUpdates");
+		char* json =
+			tgb_update_offset == 0 ?
+			nob_temp_sprintf("") :
+			nob_temp_sprintf("{\"offset\":\"%lu\"}", tgb_update_offset + 1);
+		TGBotGet(tgb_conn, "getUpdates", "application/json", json, strlen(json));
+		nob_temp_reset();
 		tgb_last_poll_ms = now;
 	}
 }
@@ -80,6 +90,34 @@ void TGBotSendText(uint64_t chat_id, char* text) {
 	nob_temp_reset();
 }
 
+void TGBotHandleUpdate(cJSON* update) {
+	cJSON* update_id_json = cJSON_GetObjectItemCaseSensitive(update, "update_id");
+	if (!cJSON_IsNumber(update_id_json)) { return; }
+	int update_id = update_id_json->valueint;
+	if ((uint64_t)update_id <= tgb_update_offset) { return; }
+	tgb_update_offset = (uint64_t)update_id;
+
+	cJSON* message_json = cJSON_GetObjectItemCaseSensitive(update, "message");
+	if (!cJSON_IsObject(message_json)) { return; }
+	cJSON* text_json = cJSON_GetObjectItemCaseSensitive(message_json, "text");
+	if (!cJSON_IsString(text_json)) { return; }
+	char* text = text_json->valuestring;
+	printf("%d: '%s'\n", update_id, text);
+}
+
+void TGBotHandleHTTPMessage(void* ev_data) {
+	MG_INFO(("TGBOT: MSG\n"));
+	struct mg_http_message* hm = (struct mg_http_message*)ev_data;
+	//printf("msg:%.*s\n", hm->body.len, hm->body.buf);
+	cJSON* msg = cJSON_ParseWithLength(hm->body.buf, hm->body.len);
+	if (!cJSON_IsObject(msg)) { return; }
+	cJSON* res = cJSON_GetObjectItemCaseSensitive(msg, "result");
+	if (!cJSON_IsArray(res)) { return; }
+	cJSON* update;
+	cJSON_ArrayForEach(update, res) { TGBotHandleUpdate(update); }
+	cJSON_Delete(msg);
+}
+
 void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 	switch (ev) {
 		case MG_EV_CONNECT:
@@ -90,13 +128,11 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 			break;
 		case MG_EV_TLS_HS:
 			MG_INFO(("TGBOT: HANDSHAKE\n"));
-			//TGBotGet(c, "getMe");
+			//TGBotGet(c, "getMe", "applcation/json", "", 0);
 			TGBotSendText(TGBOT_ADMIN_CHAT_ID, "Server started.");
 			break;
 		case MG_EV_HTTP_MSG:
-			MG_INFO(("TGBOT: MSG\n"));
-			struct mg_http_message* hm = (struct mg_http_message*)ev_data;
-			mg_hexdump(hm->body.buf, hm->body.len);
+			TGBotHandleHTTPMessage(ev_data);
 			break;
 		case MG_EV_ERROR:
 			MG_INFO(("TGBOT: ERROR '%s'\n", ev_data));

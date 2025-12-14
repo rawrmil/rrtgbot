@@ -90,10 +90,10 @@ int main(int argc, char* argv[]) {
 	signal(SIGINT, app_terminate);
 	signal(SIGTERM, app_terminate);
 	while (!is_closed) {
-		mg_mgr_poll(&mgr, 200);
+		mg_mgr_poll(&mgr, 500);
 		TGBotPoll();
 		uint64_t now = mg_millis();
-		if (started_closing != 0 && now - started_closing > 400) {
+		if (started_closing != 0 && now - started_closing > 1000) {
 			MG_INFO(("TGBOT: POLL\n"));
 			is_closed = true;
 		}
