@@ -10,6 +10,7 @@
 #define X_TGB_CHAT_MODE \
 	X(TGB_CM_DEFAULT) \
 	X(TGB_CM_ECHO) \
+	X(TGB_CM_FOO) \
 	X(TGB_CM_LENGTH)
 
 #define X(name_) name_,
@@ -112,6 +113,20 @@ TGB_Chat* TGBotGetChatById(int id) {
 	return NULL;
 }
 
+bool TGBotUserHandleCommand(TGB_Chat* chat, char* text) {
+	if (strcmp(text, "/echo") == 0) {
+		chat->mode = TGB_CM_ECHO;
+		TGBotSendText(chat->id, "To exit echo mode type /exit");
+		return true;
+	}
+	if (strcmp(text, "/foo") == 0) {
+		TGBotSendText(chat->id, "bar");
+		return true;
+	}
+	TGBotSendText(chat->id, "Unknown command.");
+	return false;
+}
+
 void TGBotHandleUpdate(cJSON* update) {
 	cJSON* update_id_json = cJSON_GetObjectItemCaseSensitive(update, "update_id");
 	if (!cJSON_IsNumber(update_id_json)) { return; }
@@ -142,11 +157,10 @@ void TGBotHandleUpdate(cJSON* update) {
 	}
 	switch (chat->mode) {
 		case TGB_CM_DEFAULT:
-			if (strcmp(text, "/echo") == 0) {
-				chat->mode = TGB_CM_ECHO;
-				TGBotSendText(chat_id, "To exit echo mode type /exit");
+			if (text[0] == '/' && TGBotUserHandleCommand(chat, text)) {
 				return;
 			}
+			TGBotSendText(chat_id, "Unknown command.");
 			break;
 		case TGB_CM_ECHO:
 			if (strcmp(text, "/exit") == 0) {
