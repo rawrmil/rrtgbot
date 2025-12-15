@@ -17,6 +17,7 @@ typedef enum TGB_ChatMode {
 	X_TGB_CHAT_MODE
 } TGB_ChatMode;
 #undef X
+extern char* TGB_CHAT_MODE_NAMES[];
 
 typedef struct TGB_Chat {
 	TGB_ChatMode mode;
@@ -29,21 +30,20 @@ typedef struct TGB_Chats {
 	size_t capacity;
 } TGB_Chats;
 
-extern char* TGB_CHAT_MODE_NAMES[];
+typedef struct TGB_Bot {
+	struct mg_connection* conn;
+	uint64_t last_poll_ms;
+	uint64_t update_offset;
+	TGB_Chats chats;
+} TGB_Bot;
 
-void TGBotSendText(uint64_t chat_id, char* text);
+extern TGB_Bot tgb;
 
-void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data);
 void TGBotConnect(struct mg_mgr* mgr);
-void TGBotGet(struct mg_connection* c, char* action, char* content_type, char* buf, size_t len);
-void TGBotPost(struct mg_connection* c, char* action, char* content_type, char* buf, size_t len);
 void TGBotPoll();
 void TGBotClose();
 
-extern struct mg_connection* tgb_conn;
-extern uint64_t tgb_last_poll_ms;
-extern uint64_t tgb_update_offset;
-extern TGB_Chats tgb_chats; // TODO: everything to 1 struct
+void TGBotSendText(uint64_t chat_id, char* text);
 
 #endif /* TGBOT_RW_H */
 
@@ -53,22 +53,7 @@ extern TGB_Chats tgb_chats; // TODO: everything to 1 struct
 char* TGB_CHAT_MODE_NAMES[] = { X_TGB_CHAT_MODE };
 #undef X
 
-struct mg_connection* tgb_conn;
-uint64_t tgb_last_poll_ms;
-uint64_t tgb_update_offset;
-TGB_Chats tgb_chats;
-
-void TGBotConnect(struct mg_mgr* mgr) {
-	Nob_String_Builder sb = {0};
-	BReader br = {0};
-	if (nob_file_exists("dbs/tgb_update_offset")) {
-		NOB_ASSERT(nob_read_entire_file("dbs/tgb_update_offset", &sb));
-		br.data = sb.items;
-		br.count = sb.count;
-		NOB_ASSERT(BReadU64(&br, &tgb_update_offset));
-	}
-	tgb_conn = mg_http_connect(mgr, TGBOT_API_URL, TGBotEventHandler, NULL);
-}
+TGB_Bot tgb;
 
 void TGBotGet(struct mg_connection* c, char* action, char* content_type, char* buf, size_t len) {
 	char* msg = nob_temp_sprintf(
@@ -96,32 +81,32 @@ void TGBotPost(struct mg_connection* c, char* action, char* content_type, char* 
 	nob_temp_reset();
 }
 
-void TGBotPoll() {
-	uint64_t now = mg_millis();
-	if (now - tgb_last_poll_ms > 1000) {
-		MG_INFO(("TGBOT: POLL\n"));
-		char* json =
-			tgb_update_offset == 0 ?
-			nob_temp_sprintf("") :
-			nob_temp_sprintf("{\"offset\":\"%lu\"}", tgb_update_offset + 1);
-		TGBotGet(tgb_conn, "getUpdates", "application/json", json, strlen(json));
-		nob_temp_reset();
-		tgb_last_poll_ms = now;
-	}
-}
-
 void TGBotSendText(uint64_t chat_id, char* text) {
 	cJSON *msg_json = cJSON_CreateObject();
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", chat_id)));
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", text));
 	char* msg_str = cJSON_PrintUnformatted(msg_json);
-	TGBotPost(tgb_conn, "sendMessage", "application/json", msg_str, strlen(msg_str));
+	TGBotPost(tgb.conn, "sendMessage", "application/json", msg_str, strlen(msg_str));
 	free(msg_str);
 	nob_temp_reset();
 }
 
+void TGBotPoll() {
+	uint64_t now = mg_millis();
+	if (now - tgb.last_poll_ms > 1000) {
+		MG_INFO(("TGBOT: POLL\n"));
+		char* json =
+			tgb.update_offset == 0 ?
+			nob_temp_sprintf("") :
+			nob_temp_sprintf("{\"offset\":\"%lu\"}", tgb.update_offset + 1);
+		TGBotGet(tgb.conn, "getUpdates", "application/json", json, strlen(json));
+		nob_temp_reset();
+		tgb.last_poll_ms = now;
+	}
+}
+
 TGB_Chat* TGBotGetChatById(int id) {
-	nob_da_foreach(TGB_Chat, chat, &tgb_chats) {
+	nob_da_foreach(TGB_Chat, chat, &tgb.chats) {
 		if (chat->id == id) { return chat; }
 	}
 	return NULL;
@@ -131,8 +116,8 @@ void TGBotHandleUpdate(cJSON* update) {
 	cJSON* update_id_json = cJSON_GetObjectItemCaseSensitive(update, "update_id");
 	if (!cJSON_IsNumber(update_id_json)) { return; }
 	int update_id = update_id_json->valueint;
-	if ((uint64_t)update_id <= tgb_update_offset) { return; }
-	tgb_update_offset = (uint64_t)update_id;
+	if ((uint64_t)update_id <= tgb.update_offset) { return; }
+	tgb.update_offset = (uint64_t)update_id;
 
 	cJSON* message_json = cJSON_GetObjectItemCaseSensitive(update, "message");
 	if (!cJSON_IsObject(message_json)) { return; }
@@ -151,7 +136,7 @@ void TGBotHandleUpdate(cJSON* update) {
 		TGB_Chat new_chat = {0};
 		new_chat.mode = TGB_CM_DEFAULT;
 		new_chat.id = chat_id;
-		nob_da_append(&tgb_chats, new_chat);
+		nob_da_append(&tgb.chats, new_chat);
 		TGBotSendText(chat_id, "Hello, stranger.");
 		return;
 	}
@@ -211,9 +196,21 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 	}
 }
 
+void TGBotConnect(struct mg_mgr* mgr) {
+	Nob_String_Builder sb = {0};
+	BReader br = {0};
+	if (nob_file_exists("dbs/tgb_update_offset")) {
+		NOB_ASSERT(nob_read_entire_file("dbs/tgb_update_offset", &sb));
+		br.data = sb.items;
+		br.count = sb.count;
+		NOB_ASSERT(BReadU64(&br, &tgb.update_offset));
+	}
+	tgb.conn = mg_http_connect(mgr, TGBOT_API_URL, TGBotEventHandler, NULL);
+}
+
 void TGBotClose() {
 	bw_temp.count = 0;
-	BWriteU64(&bw_temp, tgb_update_offset);
+	BWriteU64(&bw_temp, tgb.update_offset);
 	nob_write_entire_file("dbs/tgb_update_offset", bw_temp.items, bw_temp.count);
 }
 
