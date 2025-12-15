@@ -7,6 +7,30 @@
 #define TGBOT_API_HOST "api.telegram.org"
 #define TGBOT_API_URL "https://"TGBOT_API_HOST"/"
 
+#define X_TGB_CHAT_MODE \
+	X(TGB_CM_DEFAULT) \
+	X(TGB_CM_ECHO) \
+	X(TGB_CM_LENGTH)
+
+#define X(name_) name_,
+typedef enum TGB_ChatMode {
+	X_TGB_CHAT_MODE
+} TGB_ChatMode;
+#undef X
+
+typedef struct TGB_Chat {
+	TGB_ChatMode mode;
+	int id;
+} TGB_Chat;
+
+typedef struct TGB_Chats {
+	TGB_Chat* items;
+	size_t count;
+	size_t capacity;
+} TGB_Chats;
+
+extern char* TGB_CHAT_MODE_NAMES[];
+
 void TGBotSendText(uint64_t chat_id, char* text);
 
 void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data);
@@ -19,14 +43,20 @@ void TGBotClose();
 extern struct mg_connection* tgb_conn;
 extern uint64_t tgb_last_poll_ms;
 extern uint64_t tgb_update_offset;
+extern TGB_Chats tgb_chats; // TODO: everything to 1 struct
 
 #endif /* TGBOT_RW_H */
 
 #ifdef TGBOT_IMPLEMENTATION
 
+#define X(name_) #name_,
+char* TGB_CHAT_MODE_NAMES[] = { X_TGB_CHAT_MODE };
+#undef X
+
 struct mg_connection* tgb_conn;
 uint64_t tgb_last_poll_ms;
 uint64_t tgb_update_offset;
+TGB_Chats tgb_chats;
 
 void TGBotConnect(struct mg_mgr* mgr) {
 	Nob_String_Builder sb = {0};
@@ -90,6 +120,13 @@ void TGBotSendText(uint64_t chat_id, char* text) {
 	nob_temp_reset();
 }
 
+TGB_Chat* TGBotGetChatById(int id) {
+	nob_da_foreach(TGB_Chat, chat, &tgb_chats) {
+		if (chat->id == id) { return chat; }
+	}
+	return NULL;
+}
+
 void TGBotHandleUpdate(cJSON* update) {
 	cJSON* update_id_json = cJSON_GetObjectItemCaseSensitive(update, "update_id");
 	if (!cJSON_IsNumber(update_id_json)) { return; }
@@ -109,7 +146,32 @@ void TGBotHandleUpdate(cJSON* update) {
 	if (!cJSON_IsNumber(chat_id_json)) { return; }
 	int chat_id = chat_id_json->valueint;
 
-	TGBotSendText(chat_id, text); // Echo
+	TGB_Chat* chat = TGBotGetChatById(chat_id);
+	if (chat == NULL) {
+		TGB_Chat new_chat = {0};
+		new_chat.mode = TGB_CM_DEFAULT;
+		new_chat.id = chat_id;
+		nob_da_append(&tgb_chats, new_chat);
+		TGBotSendText(chat_id, "Hello, stranger.");
+		return;
+	}
+	switch (chat->mode) {
+		case TGB_CM_DEFAULT:
+			if (strcmp(text, "/echo") == 0) {
+				chat->mode = TGB_CM_ECHO;
+				TGBotSendText(chat_id, "To exit echo mode type /exit");
+				return;
+			}
+			break;
+		case TGB_CM_ECHO:
+			if (strcmp(text, "/exit") == 0) {
+				TGBotSendText(chat_id, "Exited echo.");
+				chat->mode = TGB_CM_DEFAULT;
+				return;
+			}
+			TGBotSendText(chat_id, text);
+			break;
+	}
 
 	MG_INFO(("%d: '%s'\n", update_id, text));
 }
