@@ -178,7 +178,6 @@ void TGBotHandleUpdate(cJSON* update) {
 void TGBotHandleHTTPMessage(void* ev_data) {
 	MG_INFO(("TGBOT: MSG\n"));
 	struct mg_http_message* hm = (struct mg_http_message*)ev_data;
-	//printf("msg:%.*s\n", hm->body.len, hm->body.buf);
 	cJSON* msg = cJSON_ParseWithLength(hm->body.buf, hm->body.len);
 	if (!cJSON_IsObject(msg)) { return; }
 	cJSON* res = cJSON_GetObjectItemCaseSensitive(msg, "result");
@@ -186,6 +185,25 @@ void TGBotHandleHTTPMessage(void* ev_data) {
 	cJSON* update;
 	cJSON_ArrayForEach(update, res) { TGBotHandleUpdate(update); }
 	cJSON_Delete(msg);
+}
+
+void TGBotWebhookEventHandler(struct mg_connection* c, int ev, void* ev_data) {
+	switch (ev) {
+		case MG_EV_HTTP_MSG:
+			struct mg_http_message* hm = (struct mg_http_message*)ev_data;
+			printf("msg:%.*s\n", hm->message.len, hm->message.buf);
+			cJSON* update = cJSON_ParseWithLength(hm->body.buf, hm->body.len);
+			if (!cJSON_IsObject(update)) {
+				mg_http_reply(c, 400, "", "");
+				return;
+			}
+			TGBotHandleUpdate(update);
+			mg_http_reply(c, 200, "", "");
+			break;
+		case MG_EV_ERROR:
+			MG_INFO(("TGBOT: ERROR '%s'\n", ev_data));
+			break;
+	}
 }
 
 void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
@@ -198,11 +216,26 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 			break;
 		case MG_EV_TLS_HS:
 			MG_INFO(("TGBOT: HANDSHAKE\n"));
-			//TGBotGet(c, "getMe", "applcation/json", "", 0);
 			TGBotSendText(TGBOT_ADMIN_CHAT_ID, "Server started.");
+			TGBotGet(c, "getWebhookInfo", "application/json", "", 0);
+#ifdef TGBOT_WEBHOOK_URL
+			// TODO: check telegram secret
+			mg_http_listen(c->mgr, "http://localhost:6766", TGBotWebhookEventHandler, NULL);
+			char msg[] = "{\"url\":\""TGBOT_WEBHOOK_URL"\"}";
+			TGBotPost(c, "setWebhook", "application/json", msg, strlen(msg));
+			nob_temp_reset();
+#else
+			TGBotPost(c, "deleteWebhook", "application/json", "", 0);
+#endif
 			break;
 		case MG_EV_HTTP_MSG:
+			//struct mg_http_message* hm = (struct mg_http_message*)ev_data;
+			//printf("msg:%.*s\n", hm->message.len, hm->message.buf);
+			// TODO: hm to TGBotHandleHTTPMessage
+			// TODO: show info responces from server
+#ifndef TGBOT_WEBHOOK_URL
 			TGBotHandleHTTPMessage(ev_data);
+#endif
 			break;
 		case MG_EV_ERROR:
 			MG_INFO(("TGBOT: ERROR '%s'\n", ev_data));

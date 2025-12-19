@@ -86,9 +86,12 @@ int main(int argc, char* argv[]) {
 
 	signal(SIGINT, app_terminate);
 	signal(SIGTERM, app_terminate);
+	uint64_t last = mg_millis();
 	while (!is_closed) {
 		mg_mgr_poll(&mgr, 100);
+#ifndef TGBOT_WEBHOOK_URL
 		TGBotPoll();
+#endif
 		uint64_t now = mg_millis();
 		if (started_closing != 0 && now - started_closing > 2000) {
 			is_closed = true;
