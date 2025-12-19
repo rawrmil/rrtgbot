@@ -94,7 +94,7 @@ void TGBotSendText(uint64_t chat_id, char* text) {
 
 void TGBotPoll() {
 	uint64_t now = mg_millis();
-	if (now - tgb.last_poll_ms > 1000) {
+	if (now - tgb.last_poll_ms > 2000) {
 		MG_INFO(("TGBOT: POLL\n"));
 		char* json =
 			tgb.update_offset == 0 ?

@@ -69,6 +69,7 @@ uint64_t started_closing;
 
 void app_terminate(int sig) {
 	TGBotSendText(TGBOT_ADMIN_CHAT_ID, "Server closed.");
+	printf("TGBOT: CLOSING\n");
 	started_closing = mg_millis();
 }
 
@@ -83,18 +84,13 @@ int main(int argc, char* argv[]) {
 	mg_mgr_init(&mgr);
 	TGBotConnect(&mgr);
 
-	//printf("tgb_update_offset=%lu\n", tgb_update_offset);
-	//tgb_update_offset = 5555;
-	//printf("tgb_update_offset=%lu\n", tgb_update_offset);
-
 	signal(SIGINT, app_terminate);
 	signal(SIGTERM, app_terminate);
 	while (!is_closed) {
-		mg_mgr_poll(&mgr, 500);
+		mg_mgr_poll(&mgr, 100);
 		TGBotPoll();
 		uint64_t now = mg_millis();
-		if (started_closing != 0 && now - started_closing > 1000) {
-			MG_INFO(("TGBOT: POLL\n"));
+		if (started_closing != 0 && now - started_closing > 2000) {
 			is_closed = true;
 		}
 	}
