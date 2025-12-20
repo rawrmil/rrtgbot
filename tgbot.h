@@ -172,12 +172,14 @@ void TGBotHandleUpdate(cJSON* update) {
 			break;
 	}
 
-	MG_INFO(("%d: '%s'\n", update_id, text));
+	//MG_INFO(("%d: '%s'\n", update_id, text));
+	MG_INFO(("update_id=%d\n", update_id, text));
 }
 
-void TGBotHandleHTTPMessage(void* ev_data) {
+void TGBotHandleHTTPMessage(void* ev_data) { // TODO: rename to poll
 	MG_INFO(("TGBOT: MSG\n"));
 	struct mg_http_message* hm = (struct mg_http_message*)ev_data;
+
 	cJSON* msg = cJSON_ParseWithLength(hm->body.buf, hm->body.len);
 	if (!cJSON_IsObject(msg)) { return; }
 	cJSON* res = cJSON_GetObjectItemCaseSensitive(msg, "result");
@@ -191,7 +193,11 @@ void TGBotWebhookEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 	switch (ev) {
 		case MG_EV_HTTP_MSG:
 			struct mg_http_message* hm = (struct mg_http_message*)ev_data;
-			printf("msg:%.*s\n", hm->message.len, hm->message.buf);
+			struct mg_str* value = mg_http_get_header(hm, "X-Telegram-Bot-Api-Secret-Token");
+			if (value == NULL) { MG_INFO(("webhook_secret: (nil)")); return; }
+			//MG_INFO(("webhook_secret: %.*s", (int)value->len, value->buf));
+			if (mg_strcmp(*value, mg_str(TGBOT_WEBHOOK_SECRET))) { return; }
+			//printf("msg:%.*s\n", hm->message.len, hm->message.buf);
 			cJSON* update = cJSON_ParseWithLength(hm->body.buf, hm->body.len);
 			if (!cJSON_IsObject(update)) {
 				mg_http_reply(c, 400, "", "");
@@ -221,7 +227,7 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 #ifdef TGBOT_WEBHOOK_URL
 			// TODO: check telegram secret
 			mg_http_listen(c->mgr, "http://localhost:6766", TGBotWebhookEventHandler, NULL);
-			char msg[] = "{\"url\":\""TGBOT_WEBHOOK_URL"\"}";
+			char msg[] = "{\"url\":\""TGBOT_WEBHOOK_URL"\",\"secret_token\":\""TGBOT_WEBHOOK_SECRET"\"}";
 			TGBotPost(c, "setWebhook", "application/json", msg, strlen(msg));
 			nob_temp_reset();
 #else
