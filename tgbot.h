@@ -79,29 +79,16 @@ char* TGB_MSG_TYPE_NAMES[] = { X_TGB_MSG_TYPE };
 
 TGB_Bot tgb;
 
-void TGBotGet(struct mg_connection* c, char* action, char* content_type, char* buf, size_t len) {
+void TGBotAPISendJSON(char* method, char* action, char* buf, size_t len) {
 	char* msg = nob_temp_sprintf(
-			"GET /bot"TGBOT_API_TOKEN"/%s HTTP/1.1\r\n"
+			"%s /bot"TGBOT_API_TOKEN"/%s HTTP/1.1\r\n"
 			"Host: "TGBOT_API_HOST"\r\n"
 			"Connection: keep-alive\r\n"
-			"Content-Type: %s\r\n"
+			"Content-Type: application/json\r\n"
 			"Content-Length: %zu\r\n"
 			"\r\n"
-			"%.*s", action, content_type, len, len, buf);
-	mg_send(c, msg, strlen(msg));
-	nob_temp_reset();
-}
-
-void TGBotPost(struct mg_connection* c, char* action, char* content_type, char* buf, size_t len) {
-	char* msg = nob_temp_sprintf(
-			"POST /bot"TGBOT_API_TOKEN"/%s HTTP/1.1\r\n"
-			"Host: "TGBOT_API_HOST"\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type: %s\r\n"
-			"Content-Length: %zu\r\n"
-			"\r\n"
-			"%.*s", action, content_type, len, len, buf);
-	mg_send(c, msg, strlen(msg));
+			"%.*s", method, action, len, len, buf);
+	mg_send(tgb.conn, msg, strlen(msg));
 	nob_temp_reset();
 }
 
@@ -122,12 +109,12 @@ TGB_MsgType TGBotMsgStackPop() { // TODO: use real queue
 
 void TGBotSendGetWebhookInfo() {
 	TGBotMsgStackAdd(TGB_MT_GET_WEBHOOK_INFO);
-	TGBotGet(tgb.conn, "getWebhookInfo", "application/json", "", 0);
+	TGBotAPISendJSON("GET", "getWebhookInfo", "", 0);
 }
 
 void TGBotSendDeleteWebhook() {
 	TGBotMsgStackAdd(TGB_MT_DELETE_WEBHOOK);
-	TGBotPost(tgb.conn, "deleteWebhook", "application/json", "", 0);
+	TGBotAPISendJSON("POST", "deleteWebhook", "", 0);
 }
 
 void TGBotSendGetUpdates() {
@@ -136,7 +123,7 @@ void TGBotSendGetUpdates() {
 		tgb.update_offset == 0 ?
 		nob_temp_sprintf("{}") :
 		nob_temp_sprintf("{\"offset\":\"%lu\"}", tgb.update_offset + 1);
-	TGBotGet(tgb.conn, "getUpdates", "application/json", json, strlen(json));
+	TGBotAPISendJSON("GET", "getUpdates", json, strlen(json));
 	nob_temp_reset();
 }
 
@@ -146,7 +133,7 @@ void TGBotSendText(uint64_t chat_id, char* text) {
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", chat_id)));
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", text));
 	char* msg_str = cJSON_PrintUnformatted(msg_json);
-	TGBotPost(tgb.conn, "sendMessage", "application/json", msg_str, strlen(msg_str));
+	TGBotAPISendJSON("POST", "sendMessage", msg_str, strlen(msg_str));
 	free(msg_str);
 	nob_temp_reset();
 }
@@ -276,7 +263,7 @@ void TGBotSendSetWebhook() { // TODO: do backend in separate file
 	TGBotMsgStackAdd(TGB_MT_SET_WEBHOOK);
 	mg_http_listen(tgb.conn->mgr, "http://localhost:6766", TGBotWebhookEventHandler, NULL);
 	char msg[] = "{\"url\":\""TGBOT_WEBHOOK_URL"\",\"secret_token\":\""TGBOT_WEBHOOK_SECRET"\"}";
-	TGBotPost(tgb.conn, "setWebhook", "application/json", msg, strlen(msg));
+	TGBotAPISendJSON("POST", "setWebhook", msg, strlen(msg));
 	nob_temp_reset();
 }
 #endif
