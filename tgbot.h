@@ -95,7 +95,7 @@ void TGBotSendText(uint64_t chat_id, char* text) {
 void TGBotPoll() {
 	uint64_t now = mg_millis();
 	if (now - tgb.last_poll_ms > 2000) {
-		MG_INFO(("TGBOT: POLL\n"));
+		MG_INFO(("POLL\n"));
 		char* json =
 			tgb.update_offset == 0 ?
 			nob_temp_sprintf("") :
@@ -176,8 +176,8 @@ void TGBotHandleUpdate(cJSON* update) {
 	MG_INFO(("update_id=%d\n", update_id, text));
 }
 
-void TGBotHandleHTTPMessage(void* ev_data) { // TODO: rename to poll
-	MG_INFO(("TGBOT: MSG\n"));
+void TGBotHandleTelegramResponse(void* ev_data) {
+	MG_INFO(("MSG\n"));
 	struct mg_http_message* hm = (struct mg_http_message*)ev_data;
 
 	cJSON* msg = cJSON_ParseWithLength(hm->body.buf, hm->body.len);
@@ -189,25 +189,30 @@ void TGBotHandleHTTPMessage(void* ev_data) { // TODO: rename to poll
 	cJSON_Delete(msg);
 }
 
+void TGBotHandleTelegramMessage(struct mg_connection* c, void* ev_data) {
+	int result = 200;
+	struct mg_http_message* hm = (struct mg_http_message*)ev_data;
+#ifdef TGBOT_WEBHOOK_URL
+	struct mg_str* value = mg_http_get_header(hm, "X-Telegram-Bot-Api-Secret-Token");
+	if (value == NULL) { MG_INFO(("webhook_secret: (nil)")); nob_return_defer(400); }
+	//MG_INFO(("webhook_secret: %.*s", (int)value->len, value->buf));
+	if (mg_strcmp(*value, mg_str(TGBOT_WEBHOOK_SECRET))) { nob_return_defer(400); }
+#endif
+	//printf("msg:%.*s\n", hm->message.len, hm->message.buf);
+	cJSON* update = cJSON_ParseWithLength(hm->body.buf, hm->body.len);
+	if (!cJSON_IsObject(update)) { nob_return_defer(400); }
+	TGBotHandleUpdate(update);
+defer:
+	mg_http_reply(c, result, "", "");
+}
+
 void TGBotWebhookEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 	switch (ev) {
 		case MG_EV_HTTP_MSG:
-			struct mg_http_message* hm = (struct mg_http_message*)ev_data;
-			struct mg_str* value = mg_http_get_header(hm, "X-Telegram-Bot-Api-Secret-Token");
-			if (value == NULL) { MG_INFO(("webhook_secret: (nil)")); return; }
-			//MG_INFO(("webhook_secret: %.*s", (int)value->len, value->buf));
-			if (mg_strcmp(*value, mg_str(TGBOT_WEBHOOK_SECRET))) { return; }
-			//printf("msg:%.*s\n", hm->message.len, hm->message.buf);
-			cJSON* update = cJSON_ParseWithLength(hm->body.buf, hm->body.len);
-			if (!cJSON_IsObject(update)) {
-				mg_http_reply(c, 400, "", "");
-				return;
-			}
-			TGBotHandleUpdate(update);
-			mg_http_reply(c, 200, "", "");
+			TGBotHandleTelegramMessage(c, ev_data);
 			break;
 		case MG_EV_ERROR:
-			MG_INFO(("TGBOT: ERROR '%s'\n", ev_data));
+			MG_INFO(("ERROR '%s'\n", ev_data));
 			break;
 	}
 }
@@ -215,17 +220,16 @@ void TGBotWebhookEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 	switch (ev) {
 		case MG_EV_CONNECT:
-			MG_INFO(("TGBOT: CONNECTION\n"));
+			MG_INFO(("CONNECTION\n"));
 			struct mg_str ca = mg_file_read(&mg_fs_posix, "/etc/ssl/certs/ca-certificates.pem");
 			struct mg_tls_opts opts = { .ca=ca, .name=mg_str("telegram.org") };
 			mg_tls_init(c, &opts);
 			break;
 		case MG_EV_TLS_HS:
-			MG_INFO(("TGBOT: HANDSHAKE\n"));
+			MG_INFO(("HANDSHAKE\n"));
 			TGBotSendText(TGBOT_ADMIN_CHAT_ID, "Server started.");
 			TGBotGet(c, "getWebhookInfo", "application/json", "", 0);
 #ifdef TGBOT_WEBHOOK_URL
-			// TODO: check telegram secret
 			mg_http_listen(c->mgr, "http://localhost:6766", TGBotWebhookEventHandler, NULL);
 			char msg[] = "{\"url\":\""TGBOT_WEBHOOK_URL"\",\"secret_token\":\""TGBOT_WEBHOOK_SECRET"\"}";
 			TGBotPost(c, "setWebhook", "application/json", msg, strlen(msg));
@@ -237,14 +241,13 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 		case MG_EV_HTTP_MSG:
 			//struct mg_http_message* hm = (struct mg_http_message*)ev_data;
 			//printf("msg:%.*s\n", hm->message.len, hm->message.buf);
-			// TODO: hm to TGBotHandleHTTPMessage
 			// TODO: show info responces from server
 #ifndef TGBOT_WEBHOOK_URL
-			TGBotHandleHTTPMessage(ev_data);
+			TGBotHandleTelegramResponse(ev_data);
 #endif
 			break;
 		case MG_EV_ERROR:
-			MG_INFO(("TGBOT: ERROR '%s'\n", ev_data));
+			MG_INFO(("ERROR '%s'\n", ev_data));
 			break;
 	}
 }
