@@ -4,7 +4,7 @@
 #define X_TGB_CHAT_MODE \
 	X(TGB_CM_DEFAULT) \
 	X(TGB_CM_ECHO) \
-	X(TGB_CM_FOO) \
+	X(TGB_CM_WORDLE) \
 	X(TGB_CM_LENGTH)
 
 #define X(name_) name_,

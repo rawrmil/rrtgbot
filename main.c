@@ -28,6 +28,12 @@
 #include "enums.h"
 #undef ENUMS_IMPLEMENTATION
 
+// --- SUBSYSTEMS ---
+
+#define WORDLE_IMPLEMENTATION
+#include "wordle.h"
+#undef WORDLE_IMPLEMENTATION
+
 // --- UTILS ---
 
 void RandomBytes(void *buf, size_t len) {
@@ -69,6 +75,7 @@ void FlagsParse(int argc, char** argv) {
 typedef struct TGB_Chat {
 	TGB_ChatMode mode;
 	int id;
+	void* mode_data;
 } TGB_Chat;
 
 typedef struct TGB_Chats {
@@ -96,8 +103,21 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 		TGBotSendText(chat->id, "bar");
 		return true;
 	}
+	if (strcmp(text, "/wordle") == 0) {
+		chat->mode = TGB_CM_WORDLE;
+		TGBotSendText(chat->id, "Wordle game started. To exit type /exit");
+		chat->mode_data = WordleInit();
+		return true;
+	}
 	TGBotSendText(chat->id, "Unknown command.");
 	return false;
+}
+
+void HandleCommandExit(TGB_Chat* chat) {
+	TGBotSendText(chat->id, "Exited echo.");
+	free(chat->mode_data);
+	chat->mode_data = NULL;
+	chat->mode = TGB_CM_DEFAULT;
 }
 
 void HandleUpdate(cJSON* update) {
@@ -128,25 +148,29 @@ void HandleUpdate(cJSON* update) {
 		TGBotSendText(chat_id, "Hello, stranger.");
 		return;
 	}
-	switch (chat->mode) {
-		case TGB_CM_DEFAULT:
-			if (text[0] == '/' && HandleUserCommand(chat, text)) {
-				return;
-			}
+
+	MG_INFO(("update_id=%d\n", update_id, text));
+
+	if (chat->mode == TGB_CM_DEFAULT) {
+		if (text[0] != '/' || !HandleUserCommand(chat, text)) {
 			TGBotSendText(chat_id, "Unknown command.");
-			break;
-		case TGB_CM_ECHO:
-			if (strcmp(text, "/exit") == 0) {
-				TGBotSendText(chat_id, "Exited echo.");
-				chat->mode = TGB_CM_DEFAULT;
-				return;
-			}
-			TGBotSendText(chat_id, text);
-			break;
+		}
+		return;
 	}
 
-	//MG_INFO(("%d: '%s'\n", update_id, text));
-	MG_INFO(("update_id=%d\n", update_id, text));
+	if (strcmp(text, "/exit") == 0) {
+		HandleCommandExit(chat);
+		return;
+	}
+
+	switch (chat->mode) {
+		case TGB_CM_ECHO:
+			TGBotSendText(chat_id, text);
+			break;
+		case TGB_CM_WORDLE:
+			WordleMessage(chat->mode_data);
+			break;
+	}
 }
 
 // --- MAIN ---
