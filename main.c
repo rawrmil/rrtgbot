@@ -168,7 +168,7 @@ void HandleUpdate(cJSON* update) {
 			TGBotSendText(chat_id, text);
 			break;
 		case TGB_CM_WORDLE:
-			WordleMessage(chat->mode_data);
+			WordleMessage(chat_id, text, chat->mode_data);
 			break;
 	}
 }
