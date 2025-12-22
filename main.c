@@ -24,6 +24,10 @@
 #include "tgbot.h"
 #undef TGBOT_IMPLEMENTATION
 
+#define ENUMS_IMPLEMENTATION
+#include "enums.h"
+#undef ENUMS_IMPLEMENTATION
+
 // --- UTILS ---
 
 void RandomBytes(void *buf, size_t len) {
@@ -62,6 +66,40 @@ void FlagsParse(int argc, char** argv) {
 
 // --- EVENTS ---
 
+typedef struct TGB_Chat {
+	TGB_ChatMode mode;
+	int id;
+} TGB_Chat;
+
+typedef struct TGB_Chats {
+	TGB_Chat* items;
+	size_t count;
+	size_t capacity;
+} TGB_Chats;
+
+TGB_Chats chats;
+
+TGB_Chat* TGBotGetChatById(int id) {
+	nob_da_foreach(TGB_Chat, chat, &chats) {
+		if (chat->id == id) { return chat; }
+	}
+	return NULL;
+}
+
+bool HandleUserCommand(TGB_Chat* chat, char* text) {
+	if (strcmp(text, "/echo") == 0) {
+		chat->mode = TGB_CM_ECHO;
+		TGBotSendText(chat->id, "To exit echo mode type /exit");
+		return true;
+	}
+	if (strcmp(text, "/foo") == 0) {
+		TGBotSendText(chat->id, "bar");
+		return true;
+	}
+	TGBotSendText(chat->id, "Unknown command.");
+	return false;
+}
+
 void HandleUpdate(cJSON* update) {
 	cJSON* update_id_json = cJSON_GetObjectItemCaseSensitive(update, "update_id");
 	if (!cJSON_IsNumber(update_id_json)) { return; }
@@ -86,13 +124,13 @@ void HandleUpdate(cJSON* update) {
 		TGB_Chat new_chat = {0};
 		new_chat.mode = TGB_CM_DEFAULT;
 		new_chat.id = chat_id;
-		nob_da_append(&tgb.chats, new_chat);
+		nob_da_append(&chats, new_chat);
 		TGBotSendText(chat_id, "Hello, stranger.");
 		return;
 	}
 	switch (chat->mode) {
 		case TGB_CM_DEFAULT:
-			if (text[0] == '/' && TGBotUserHandleCommand(chat, text)) {
+			if (text[0] == '/' && HandleUserCommand(chat, text)) {
 				return;
 			}
 			TGBotSendText(chat_id, "Unknown command.");

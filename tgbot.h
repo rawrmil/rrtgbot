@@ -7,19 +7,6 @@
 #define TGBOT_API_HOST "api.telegram.org"
 #define TGBOT_API_URL "https://"TGBOT_API_HOST"/"
 
-#define X_TGB_CHAT_MODE \
-	X(TGB_CM_DEFAULT) \
-	X(TGB_CM_ECHO) \
-	X(TGB_CM_FOO) \
-	X(TGB_CM_LENGTH)
-
-#define X(name_) name_,
-typedef enum TGB_ChatMode {
-	X_TGB_CHAT_MODE
-} TGB_ChatMode;
-#undef X
-extern char* TGB_CHAT_MODE_NAMES[];
-
 #define X_TGB_MSG_TYPE \
 	X(TGB_MT_UNKNOWN) \
 	X(TGB_MT_SEND_MESSAGE) \
@@ -35,17 +22,6 @@ typedef enum TGB_MsgType {
 } TGB_MsgType;
 #undef X
 
-typedef struct TGB_Chat {
-	TGB_ChatMode mode;
-	int id;
-} TGB_Chat;
-
-typedef struct TGB_Chats {
-	TGB_Chat* items;
-	size_t count;
-	size_t capacity;
-} TGB_Chats;
-
 #define TGB_MSG_STACK_CAPACITY 256
 
 typedef void (*TGB_HandleUpdate)(cJSON*);
@@ -57,7 +33,6 @@ typedef struct TGB_Bot {
 	uint64_t update_offset;
 	TGB_MsgType msg_queue[TGB_MSG_STACK_CAPACITY];
 	int msg_queue_len;
-	TGB_Chats chats;
 } TGB_Bot;
 
 extern TGB_Bot tgb;
@@ -71,10 +46,6 @@ void TGBotSendText(uint64_t chat_id, char* text);
 #endif /* TGBOT_RW_H */
 
 #ifdef TGBOT_IMPLEMENTATION
-
-#define X(name_) #name_,
-char* TGB_CHAT_MODE_NAMES[] = { X_TGB_CHAT_MODE };
-#undef X
 
 #define X(name_) #name_,
 char* TGB_MSG_TYPE_NAMES[] = { X_TGB_MSG_TYPE };
@@ -148,27 +119,6 @@ void TGBotPoll() {
 		TGBotSendGetUpdates();
 		tgb.last_poll_ms = now;
 	}
-}
-
-TGB_Chat* TGBotGetChatById(int id) {
-	nob_da_foreach(TGB_Chat, chat, &tgb.chats) {
-		if (chat->id == id) { return chat; }
-	}
-	return NULL;
-}
-
-bool TGBotUserHandleCommand(TGB_Chat* chat, char* text) {
-	if (strcmp(text, "/echo") == 0) {
-		chat->mode = TGB_CM_ECHO;
-		TGBotSendText(chat->id, "To exit echo mode type /exit");
-		return true;
-	}
-	if (strcmp(text, "/foo") == 0) {
-		TGBotSendText(chat->id, "bar");
-		return true;
-	}
-	TGBotSendText(chat->id, "Unknown command.");
-	return false;
 }
 
 void TGBotHandleTelegramResponse(void* ev_data) {
