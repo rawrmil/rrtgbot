@@ -114,7 +114,10 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 }
 
 void HandleCommandExit(TGB_Chat* chat) {
-	TGBotSendText(chat->id, "Exited echo.");
+	switch (chat->mode) {
+		case TGB_CM_ECHO: TGBotSendText(chat->id, "Exited echo."); break;
+		case TGB_CM_WORDLE: TGBotSendText(chat->id, "Exited Wordle."); break;
+	}
 	free(chat->mode_data);
 	chat->mode_data = NULL;
 	chat->mode = TGB_CM_DEFAULT;
@@ -145,11 +148,16 @@ void HandleUpdate(cJSON* update) {
 		new_chat.mode = TGB_CM_DEFAULT;
 		new_chat.id = chat_id;
 		nob_da_append(&chats, new_chat);
-		TGBotSendText(chat_id, "Hello, stranger.");
-		return;
+		chat = &chats.items[chats.count - 1];
 	}
 
 	MG_INFO(("update_id=%d\n", update_id, text));
+
+	if (strcmp(text, "/start") == 0) {
+		TGBotSendText(chat_id, "Hello, stranger.");
+		HandleCommandExit(chat);
+		return;
+	}
 
 	if (chat->mode == TGB_CM_DEFAULT) {
 		if (text[0] != '/' || !HandleUserCommand(chat, text)) {
