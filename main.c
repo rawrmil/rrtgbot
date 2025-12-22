@@ -62,6 +62,55 @@ void FlagsParse(int argc, char** argv) {
 
 // --- EVENTS ---
 
+void HandleUpdate(cJSON* update) {
+	cJSON* update_id_json = cJSON_GetObjectItemCaseSensitive(update, "update_id");
+	if (!cJSON_IsNumber(update_id_json)) { return; }
+	int update_id = update_id_json->valueint;
+	if ((uint64_t)update_id <= tgb.update_offset) { return; }
+	tgb.update_offset = (uint64_t)update_id;
+
+	cJSON* message_json = cJSON_GetObjectItemCaseSensitive(update, "message");
+	if (!cJSON_IsObject(message_json)) { return; }
+	cJSON* text_json = cJSON_GetObjectItemCaseSensitive(message_json, "text");
+	if (!cJSON_IsString(text_json)) { return; }
+	char* text = text_json->valuestring;
+
+	cJSON* chat_json = cJSON_GetObjectItemCaseSensitive(message_json, "chat");
+	if (!cJSON_IsObject(chat_json)) { return; }
+	cJSON* chat_id_json = cJSON_GetObjectItemCaseSensitive(chat_json, "id");
+	if (!cJSON_IsNumber(chat_id_json)) { return; }
+	int chat_id = chat_id_json->valueint;
+
+	TGB_Chat* chat = TGBotGetChatById(chat_id);
+	if (chat == NULL) {
+		TGB_Chat new_chat = {0};
+		new_chat.mode = TGB_CM_DEFAULT;
+		new_chat.id = chat_id;
+		nob_da_append(&tgb.chats, new_chat);
+		TGBotSendText(chat_id, "Hello, stranger.");
+		return;
+	}
+	switch (chat->mode) {
+		case TGB_CM_DEFAULT:
+			if (text[0] == '/' && TGBotUserHandleCommand(chat, text)) {
+				return;
+			}
+			TGBotSendText(chat_id, "Unknown command.");
+			break;
+		case TGB_CM_ECHO:
+			if (strcmp(text, "/exit") == 0) {
+				TGBotSendText(chat_id, "Exited echo.");
+				chat->mode = TGB_CM_DEFAULT;
+				return;
+			}
+			TGBotSendText(chat_id, text);
+			break;
+	}
+
+	//MG_INFO(("%d: '%s'\n", update_id, text));
+	MG_INFO(("update_id=%d\n", update_id, text));
+}
+
 // --- MAIN ---
 
 bool is_closed;
@@ -82,7 +131,7 @@ int main(int argc, char* argv[]) {
 
 	struct mg_mgr mgr;
 	mg_mgr_init(&mgr);
-	TGBotConnect(&mgr);
+	TGBotConnect(&mgr, HandleUpdate);
 
 	signal(SIGINT, app_terminate);
 	signal(SIGTERM, app_terminate);
