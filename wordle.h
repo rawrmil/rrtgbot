@@ -59,28 +59,33 @@ uint32_t utf8_to_codepoint(struct mg_str s, uint8_t* l_out) {
 	return cp;
 }
 
+uint8_t WordleLookupLetter(uint32_t cp) {
+	// а - 0, б - 1, в - 2, ..., я = 32, й = 33, ё - 34
+	if (cp == (uint32_t)-1) { return (uint8_t)-1; }
+	uint8_t lkp_i = (uint8_t)-1;
+	if (cp >= 0x430 && cp <= 0x44f) { lkp_i = cp - 0x430; }
+	if (cp >= 0x410 && cp <= 0x42f) { lkp_i = cp - 0x410; }
+	if (cp == 0x439 || cp == 0x419) { lkp_i = 33; }
+	if (cp == 0x451 || cp == 0x401) { lkp_i = 34; }
+	return lkp_i;
+}
+
 void WordleMessage(int chat_id, char* text, void* data) {
 	bool result = true;
 	Wordle* wordle = (Wordle*)data;
 	struct mg_str word = mg_str(text);
 	size_t counter = 0;
-	for (size_t i = 0; i < word.len; i++) { printf("%02x", (uint8_t)word.buf[i]); }
-	printf("\n");
 	for (size_t i = 0; i < word.len; ) {
-		mg_hexdump(&word.buf[i], word.len - i);
-		uint8_t l;
-		uint32_t cp = utf8_to_codepoint(mg_str(&word.buf[i]), &l);
-		if (cp == (uint32_t)-1) { nob_return_defer(false); }
-		uint8_t lkp_i = 255;
-		if (cp >= 0x430 && cp <= 0x44f) { lkp_i = cp - 0x430; }
-		if (cp >= 0x410 && cp <= 0x42f) { lkp_i = cp - 0x410; }
-		if (cp == 0x451 || cp == 0x401) { lkp_i = 33; }
-		if (lkp_i == 255) { nob_return_defer(false); }
 		if (counter >= 6) { nob_return_defer(false); }
-
+		//mg_hexdump(&word.buf[i], word.len - i);
+		uint8_t l;
+		uint8_t lkp_i = WordleLookupLetter(utf8_to_codepoint(mg_str(&word.buf[i]), &l));
+		if (lkp_i == (uint8_t)-1) { nob_return_defer(false); }
+		printf("%d ", lkp_i);
 		counter++;
 		i += l;
 	}
+	printf("\n");
 	nob_temp_reset();
 	if (counter != 5) { nob_return_defer(false); }
 defer:
