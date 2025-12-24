@@ -81,7 +81,16 @@ void WordleMessage(int chat_id, char* text, void* data) {
 		uint8_t l;
 		uint8_t lkp_i = WordleLookupLetter(utf8_to_codepoint(mg_str(&word.buf[i]), &l));
 		if (lkp_i == (uint8_t)-1) { nob_return_defer(false); }
-		printf("%d ", lkp_i);
+		if (lkp_i == wordle->word[counter]) {
+			wordle->tiles[wordle->word_index * 5 + counter] = 3;
+		} else {
+			for (size_t i = 0; i < 5; i++) {
+				if (lkp_i == wordle->word[i]) {
+					wordle->tiles[wordle->word_index * 5 + counter] = 2;
+					break;
+				}
+			}
+		}
 		counter++;
 		i += l;
 	}
@@ -99,9 +108,30 @@ defer:
 		wordle->word_index++;
 		Nob_String_Builder sb = {0};
 		nob_sb_appendf(&sb, "Word is valid:\n");
-		nob_sb_appendf(&sb, "⬜️🟨🟩⬜️🟨\n");
+		nob_sb_appendf(&sb, "```txt\n");
+		for (size_t i = 0; i < wordle->word_index; i++) {
+			nob_sb_appendf(&sb, "abcde -> ");
+			for (size_t j = 0; j < 5; j++) {
+				switch (wordle->tiles[i * 5 + j]) {
+				case 1:
+					nob_sb_appendf(&sb, "⬜️");
+					break;
+				case 2:
+					nob_sb_appendf(&sb, "🟨");
+					break;
+				case 3:
+					nob_sb_appendf(&sb, "🟩");
+					break;
+				default:
+					nob_sb_appendf(&sb, "⬜️");
+					break;
+				}
+			}
+			nob_sb_appendf(&sb, "\n");
+		}
+		nob_sb_appendf(&sb, "```\n");
 		nob_sb_append_null(&sb);
-		TGBotSendText(chat_id, sb.items);
+		TGBotSendTextMD(chat_id, sb.items);
 		nob_sb_free(sb);
 	}
 }
