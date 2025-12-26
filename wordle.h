@@ -10,6 +10,7 @@ typedef struct Wordle {
 	uint8_t word[5];
 	uint8_t words[40]; // 5 * 8
 	uint8_t tiles[40]; // 5 * 8
+	uint8_t tried[33];
 	// 0 - unknown
 	// 1 - letter doesn't exist
 	// 2 - letter does exist
@@ -188,6 +189,23 @@ defer:
 	nob_sb_free(sb);
 }
 
+void WordleAppendTile(Nob_String_Builder* sb, uint8_t t) {
+	switch (t) {
+		case 1:
+			nob_sb_appendf(sb, "⬜️");
+			break;
+		case 2:
+			nob_sb_appendf(sb, "🟨");
+			break;
+		case 3:
+			nob_sb_appendf(sb, "🟩");
+			break;
+		default:
+			nob_sb_appendf(sb, "⬜️");
+			break;
+	}
+}
+
 bool WordleMessage(int chat_id, char* text, void* data) {
 	bool result = true;
 	Wordle* wordle = (Wordle*)data;
@@ -201,16 +219,6 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 		wordle->words[wordle->word_index * 5 + counter] = rc;
 		if (rc == (uint8_t)-1) { nob_return_defer(false); }
 		//printf("rc=%d,word[%d]=%d\n", rc, counter, wordle->word[counter]);
-		if (rc == wordle->word[counter]) {
-			wordle->tiles[wordle->word_index * 5 + counter] = 3;
-		} else {
-			for (size_t j = 0; j < 5; j++) {
-				if (rc == wordle->word[j]) {
-					wordle->tiles[wordle->word_index * 5 + counter] = 2;
-					break;
-				}
-			}
-		}
 		counter++;
 		if (counter == 5) { break; }
 	}
@@ -224,6 +232,22 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 		}
 	}
 	if (!found_word) { nob_return_defer(false); }
+	for (size_t i = 0; i < 5; i++) {
+		uint8_t rc = wordle->words[wordle->word_index * 5 + i];
+		if (rc > 32) { NOB_UNREACHABLE("rc > 32"); }
+		if (rc == wordle->word[i]) {
+			wordle->tiles[wordle->word_index * 5 + i] = 3;
+		} else {
+			for (size_t j = 0; j < 5; j++) {
+				if (rc == wordle->word[j]) {
+					wordle->tiles[wordle->word_index * 5 + i] = 2;
+					break;
+				}
+			}
+		}
+		uint8_t tile_status = wordle->tiles[wordle->word_index * 5 + i];
+		if (tile_status > wordle->tried[rc]) { wordle->tried[rc] = tile_status; }
+	}
 defer:
 	Nob_String_Builder sb = {0};
 	if (!result) {
@@ -245,25 +269,12 @@ defer:
 			}
 			nob_sb_appendf(&sb, " -> ");
 			for (size_t j = 0; j < 5; j++) {
-				switch (wordle->tiles[i * 5 + j]) {
-				case 1:
-					nob_sb_appendf(&sb, "⬜️");
-					break;
-				case 2:
-					nob_sb_appendf(&sb, "🟨");
-					break;
-				case 3:
-					nob_sb_appendf(&sb, "🟩");
-					break;
-				default:
-					//NOB_UNREACHABLE("^here");
-					nob_sb_appendf(&sb, "⬜️");
-					break;
-				}
+				WordleAppendTile(&sb, wordle->tiles[i * 5 + j]);
 			}
 			nob_sb_appendf(&sb, "\n");
 		}
 		nob_sb_appendf(&sb, "```\n");
+		nob_sb_appendf(&sb, "Буквы: ");
 		bool guessed_right = true;
 		for (size_t i = 0; i < 5; i++) {
 			if (wordle->tiles[wordle->word_index * 5 + i] != 3) {
@@ -278,6 +289,15 @@ defer:
 					ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
 				}
 				nob_sb_appendf(&sb, "'");
+		} else {
+			for (size_t i = 0; i < 33; i++) {
+				if (wordle->tried[i] != 1) {
+					ut8cptosb(&sb, WordleRuCodeToCP(i));
+					WordleAppendTile(&sb, wordle->tried[i]);
+					nob_sb_appendf(&sb, "; ");
+				}
+			}
+			nob_sb_appendf(&sb, "\n");
 		}
 		nob_sb_append_null(&sb);
 		TGBotSendTextMD(chat_id, sb.items);
