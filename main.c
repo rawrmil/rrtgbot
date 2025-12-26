@@ -193,6 +193,8 @@ void app_terminate(int sig) {
 }
 
 int main(int argc, char* argv[]) {
+	WordleInitWords();
+
 	FlagsParse(argc, argv);
 
 	NOB_ASSERT(nob_mkdir_if_not_exists("dbs"));

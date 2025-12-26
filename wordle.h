@@ -16,12 +16,33 @@ typedef struct Wordle {
 	// 3 - letter exists in this place
 } Wordle;
 
+typedef struct WordleWord {
+	uint8_t difficulty;
+	// 0 - unknown
+	// 1 - easy
+	// 2 - medium
+	// 3 - hard
+	// ? - funny
+	uint8_t word[5];
+} WordleWord;
+
+typedef struct WordleWords {
+	WordleWord* items;
+	size_t count;
+	size_t capacity;
+} WordleWords;
+
+extern WordleWords wordle_words;
+
 void* WordleInit();
+void WordleInitWords();
 void WordleMessage(int chat_id, char* text, void* data);
 
 #endif /* WORDLE_H */
 
 #ifdef WORDLE_IMPLEMENTATION
+
+WordleWords wordle_words;
 
 void* WordleInit() {
 	Wordle* wordle = calloc(1, sizeof(*wordle));
@@ -97,7 +118,6 @@ bool ut8cptosb(Nob_String_Builder* sb, uint32_t cp) {
 }
 
 uint8_t WordleCPToRuCode(uint32_t cp) {
-	// а - 0, б - 1, в - 2, ..., я = 31, ё - 32
 	if (cp == (uint32_t)-1) { return (uint8_t)-1; }
 	uint8_t rc = (uint8_t)-1;
 	if (cp >= 0x430 && cp <= 0x44f) { rc = cp - 0x430; }
@@ -111,6 +131,53 @@ uint32_t WordleRuCodeToCP(uint8_t rc) {
 	if (rc > 32) { return (uint32_t)-1; }
 	if (rc != 32) { return 0x430 + rc; }
 	return 0x451;
+}
+
+void WordleInitWords() {
+	bool result = true;
+	Nob_String_Builder fdata = {0};
+	nob_read_entire_file("resources/wordle_bank.txt", &fdata);
+	WordleWord curr = {0};
+	size_t index = 0;
+	for (size_t i = 0; i < fdata.count; ) {
+		uint32_t cp;
+		i += ut8cp(&fdata.items[i], fdata.count - i, &cp);
+		//printf("! %zu\n", l);
+		if (cp == (uint32_t)-1) { nob_return_defer(false); }
+		switch (cp) {
+		case '\n':
+			nob_da_append(&wordle_words, curr);
+			index = 0;
+			break;
+		case '-': curr.difficulty = 0; break;
+		case '1': curr.difficulty = 1; break;
+		case '2': curr.difficulty = 2; break;
+		case '3': curr.difficulty = 3; break;
+		default:
+			uint8_t lkp_i = WordleCPToRuCode(cp);
+			if (index == 5) { nob_return_defer(false); }
+			if (lkp_i == (uint8_t)-1) { nob_return_defer(false); }
+			curr.word[index] = lkp_i;
+			index++;
+			break;
+		}
+	}
+defer:
+	if (!result) { MG_ERROR(("Wordle parsing error.")); }
+	nob_sb_free(fdata);
+	Nob_String_Builder sb = {0};
+	for (size_t i = 0; i < wordle_words.count; i++) {
+		nob_sb_append_cstr(&sb, " ");
+		nob_sb_appendf(&sb, "%lu-", wordle_words.items[i].difficulty);
+		for (size_t j = 0; j < 5; j++) {
+			ut8cptosb(&sb, WordleRuCodeToCP(wordle_words.items[i].word[j]));
+		}
+		if (i == 10) { break; }
+	}
+	nob_sb_appendf(&sb, " ...\n");
+	nob_sb_append_null(&sb);
+	printf("Wordle words loaded:%.*s\n", (int)sb.count, sb.items);
+	nob_sb_free(sb);
 }
 
 void WordleMessage(int chat_id, char* text, void* data) {
