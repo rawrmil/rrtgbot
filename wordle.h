@@ -42,19 +42,6 @@ bool WordleMessage(int chat_id, char* text, void* data);
 
 #ifdef WORDLE_IMPLEMENTATION
 
-WordleWords wordle_words;
-
-void* WordleInit() {
-	Wordle* wordle = calloc(1, sizeof(*wordle));
-	if (wordle_words.count != 0) {
-		size_t i = rand() % wordle_words.count;
-		for (size_t j = 0; j < 5; j++) {
-			wordle->word[j] = wordle_words.items[i].word[j];
-		}
-	}
-	return (void*)wordle;
-}
-
 size_t ut8cplen(uint8_t c) {
 	if ((c & 0x80) == 0x00) { return 1; } // 0xxxxxxx
 	if ((c & 0xE0) == 0xC0) { return 2; } // 001xxxxx
@@ -118,6 +105,8 @@ bool ut8cptosb(Nob_String_Builder* sb, uint32_t cp) {
 	nob_da_append_many(sb, out, len);
 }
 
+WordleWords wordle_words;
+
 uint8_t WordleCPToRuCode(uint32_t cp) {
 	if (cp == (uint32_t)-1) { return (uint8_t)-1; }
 	uint8_t rc = (uint8_t)-1;
@@ -134,6 +123,20 @@ uint32_t WordleRuCodeToCP(uint8_t rc) {
 	return 0x451;
 }
 
+void* WordleInit() {
+	Wordle* wordle = calloc(1, sizeof(*wordle));
+	if (wordle_words.count == 0) { return NULL; }
+	Nob_String_Builder sb = {0};
+	size_t i = rand() % wordle_words.count;
+	for (size_t j = 0; j < 5; j++) {
+		wordle->word[j] = wordle_words.items[i].word[j];
+		ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
+	}
+	MG_INFO(("WORD: %.*s\n", (int)sb.count, sb.items));
+	nob_sb_free(sb);
+	return (void*)wordle;
+}
+
 void WordleInitWords() {
 	bool result = true;
 	Nob_String_Builder fdata = {0};
@@ -143,7 +146,6 @@ void WordleInitWords() {
 	for (size_t i = 0; i < fdata.count; ) {
 		uint32_t cp;
 		i += ut8cp(&fdata.items[i], fdata.count - i, &cp);
-		//printf("! %zu\n", l);
 		if (cp == (uint32_t)-1) { nob_return_defer(false); }
 		switch (cp) {
 		case '\n':
@@ -193,10 +195,6 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 		//mg_hexdump(&word.buf[i], word.len - i);
 		uint8_t rc = WordleCPToRuCode(cp);
 		wordle->words[wordle->word_index * 5 + counter] = rc;
-		//printf("rc=%lu\n", rc);
-		//uint8_t out[4];
-		//size_t l = ut8cptobuf(WordleRuCodeToCP(rc), out);
-		//printf("letter=%.*s\n", (int)l, out);
 		if (rc == (uint8_t)-1) { nob_return_defer(false); }
 		if (rc == wordle->word[counter]) {
 			wordle->tiles[wordle->word_index * 5 + counter] = 3;
@@ -211,7 +209,6 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 		counter++;
 		if (counter > 5) { nob_return_defer(false); }
 	}
-	printf("\n");
 	nob_temp_reset();
 	if (counter != 5) { nob_return_defer(false); }
 	bool found_word = false;

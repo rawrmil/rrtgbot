@@ -105,8 +105,12 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 	}
 	if (strcmp(text, "/wordle") == 0) {
 		chat->mode = TGB_CM_WORDLE;
-		TGBotSendText(chat->id, "Wordle game started. To exit type /exit");
 		chat->mode_data = WordleInit();
+		if (chat->mode_data == NULL) {
+			TGBotSendText(chat->id, "Wordle game internal error.");
+			return true;
+		}
+		TGBotSendText(chat->id, "Wordle game started. To exit type /exit");
 		return true;
 	}
 	TGBotSendText(chat->id, "Unknown command.");
