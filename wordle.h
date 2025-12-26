@@ -200,21 +200,15 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 		uint8_t rc = WordleCPToRuCode(cp);
 		wordle->words[wordle->word_index * 5 + counter] = rc;
 		if (rc == (uint8_t)-1) { nob_return_defer(false); }
-		printf("counter=%d\n", counter);
-		//printf("rc=%d,word[counter]=%d\n", rc, wordle->word[counter]);
+		//printf("rc=%d,word[%d]=%d\n", rc, counter, wordle->word[counter]);
 		if (rc == wordle->word[counter]) {
 			wordle->tiles[wordle->word_index * 5 + counter] = 3;
-			//printf("HERE\n");
 		} else {
 			for (size_t j = 0; j < 5; j++) {
 				if (rc == wordle->word[j]) {
-					//printf("SOMEWHERE\n");
 					wordle->tiles[wordle->word_index * 5 + counter] = 2;
 					break;
 				}
-			}
-			if (wordle->tiles[wordle->word_index * 5 + counter] != 2) {
-				wordle->tiles[wordle->word_index * 5 + counter] = 1;
 			}
 		}
 		counter++;
@@ -233,14 +227,12 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 defer:
 	Nob_String_Builder sb = {0};
 	if (!result) {
-		if (found_word) {
-			// TODO: TGBotSendf
-			TGBotSendText(chat_id, "Ошибка недопустимое слово.");
-			//TGBotSendText(chat_id, "Error invalid word.");
-		} else {
-			TGBotSendText(chat_id, "Такого слова нет в словаре.");
-			//TGBotSendText(chat_id, "No such word in dictionary.");
+		for (size_t j = 0; j < 5; j++) {
+			wordle->tiles[wordle->word_index * 5 + j] = 1;
 		}
+		// TODO: TGBotSendf
+		TGBotSendText(chat_id, "Ошибка недопустимое слово.");
+		//TGBotSendText(chat_id, "Error invalid word.");
 	} else {
 		nob_sb_appendf(&sb, "Слово существует:\n");
 		//nob_sb_appendf(&sb, "Word exists:\n");
