@@ -117,7 +117,7 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 		//TGBotSendText(chat->id, "Wordle game started. To exit type /exit");
 		return true;
 	}
-	TGBotSendText(chat->id, "Неизвестная команда.");
+	TGBotSendText(chat->id, "Неизвестная команда. Помощь: /help");
 	//TGBotSendText(chat->id, "Unknown command.");
 	return false;
 }
@@ -164,8 +164,12 @@ void HandleUpdate(cJSON* update) {
 
 	MG_INFO(("update_id=%d\n", update_id, text));
 
-	if (strcmp(text, "/start") == 0) {
-		TGBotSendText(chat_id, "Hello, stranger.");
+	if (!strcmp(text, "/start") || !strcmp(text, "/help")) {
+		TGBotSendText(chat_id,
+				"/help - помощь\n"
+				"/wordle - Вордл (угадай слово из пяти букв)\n"
+				"/echo - режим эхо\n"
+				"/foo - для теста кароч");
 		HandleCommandExit(chat);
 		return;
 	}
@@ -173,7 +177,7 @@ void HandleUpdate(cJSON* update) {
 	if (chat->mode == TGB_CM_DEFAULT) {
 		if (text[0] == '/') { HandleUserCommand(chat, text); }
 		else {
-			TGBotSendText(chat->id, "Команды начинаяются с '/'.");
+			TGBotSendText(chat->id, "Команды начинаяются с '/'. Помощь: /help");
 			//TGBotSendText(chat->id, "Commands start '/'.");
 		}
 		return;
