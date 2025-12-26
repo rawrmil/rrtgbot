@@ -178,7 +178,7 @@ void TGBotWebhookEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 #ifdef TGBOT_WEBHOOK_URL
 void TGBotSendSetWebhook() { // TODO: do backend in separate file
 	TGBotMsgStackAdd(TGB_MT_SET_WEBHOOK);
-	mg_http_listen(tgb.conn->mgr, "http://localhost:6766", TGBotWebhookEventHandler, NULL);
+	mg_http_listen(tgb.conn->mgr, "http://localhost:"TGBOT_WEBHOOK_PORT, TGBotWebhookEventHandler, NULL);
 	char msg[] = "{\"url\":\""TGBOT_WEBHOOK_URL"\",\"secret_token\":\""TGBOT_WEBHOOK_SECRET"\"}";
 	TGBotAPISendJSON("POST", "setWebhook", msg, strlen(msg));
 	nob_temp_reset();
