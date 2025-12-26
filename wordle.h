@@ -210,7 +210,7 @@ void WordleSendTried(int chat_id, Wordle* wordle) {
 	Nob_String_Builder sb = {0};
 	nob_sb_appendf(&sb, "Буквы: ");
 	for (size_t i = 0; i < 33; i++) {
-		if (wordle->tried[i] != 1) {
+		if (wordle->tried[i] > 0) {
 			ut8cptosb(&sb, WordleRuCodeToCP(i));
 			WordleAppendTile(&sb, wordle->tried[i]);
 			nob_sb_appendf(&sb, "; ");
@@ -251,6 +251,7 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 	for (size_t i = 0; i < 5; i++) {
 		uint8_t rc = wordle->words[wordle->word_index * 5 + i];
 		if (rc > 32) { NOB_UNREACHABLE("rc > 32"); }
+		wordle->tiles[wordle->word_index * 5 + i] = 1;
 		if (rc == wordle->word[i]) {
 			wordle->tiles[wordle->word_index * 5 + i] = 3;
 		} else {
@@ -268,7 +269,7 @@ defer:
 	Nob_String_Builder sb = {0};
 	if (!result) {
 		for (size_t j = 0; j < 5; j++) {
-			wordle->tiles[wordle->word_index * 5 + j] = 1;
+			wordle->tiles[wordle->word_index * 5 + j] = 0;
 		}
 		// TODO: TGBotSendf
 		TGBotSendText(chat_id, "Ошибка недопустимое слово.");
