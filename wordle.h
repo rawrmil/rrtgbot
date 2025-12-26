@@ -8,8 +8,8 @@
 typedef struct Wordle {
 	uint8_t word_index;
 	uint8_t word[5];
-	uint8_t words[30]; // 5 * 6
-	uint8_t tiles[30]; // 5 * 6
+	uint8_t words[40]; // 5 * 8
+	uint8_t tiles[40]; // 5 * 8
 	// 0 - unknown
 	// 1 - letter doesn't exist
 	// 2 - letter does exist
@@ -196,24 +196,29 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 	uint32_t cp;
 	for (size_t i = 0; i < word.len; ) {
 		i += ut8cp(&word.buf[i], word.len - i, &cp);
-		if (counter >= 6) { nob_return_defer(false); }
 		//mg_hexdump(&word.buf[i], word.len - i);
 		uint8_t rc = WordleCPToRuCode(cp);
 		wordle->words[wordle->word_index * 5 + counter] = rc;
 		if (rc == (uint8_t)-1) { nob_return_defer(false); }
+		printf("counter=%d\n", counter);
+		//printf("rc=%d,word[counter]=%d\n", rc, wordle->word[counter]);
 		if (rc == wordle->word[counter]) {
-			//printf("rc=%d,word[counter]=%d\n", rc, wordle->word[counter]);
 			wordle->tiles[wordle->word_index * 5 + counter] = 3;
+			//printf("HERE\n");
 		} else {
 			for (size_t j = 0; j < 5; j++) {
 				if (rc == wordle->word[j]) {
+					//printf("SOMEWHERE\n");
 					wordle->tiles[wordle->word_index * 5 + counter] = 2;
 					break;
 				}
 			}
+			if (wordle->tiles[wordle->word_index * 5 + counter] != 2) {
+				wordle->tiles[wordle->word_index * 5 + counter] = 1;
+			}
 		}
 		counter++;
-		if (counter > 5) { nob_return_defer(false); }
+		if (counter == 5) { break; }
 	}
 	nob_temp_reset();
 	if (counter != 5) { nob_return_defer(false); }
@@ -240,6 +245,8 @@ defer:
 		nob_sb_appendf(&sb, "Слово существует:\n");
 		//nob_sb_appendf(&sb, "Word exists:\n");
 		nob_sb_appendf(&sb, "```txt\n");
+		//mg_hexdump(wordle->words, 40);
+		//mg_hexdump(wordle->tiles, 40);
 		for (size_t i = 0; i < wordle->word_index + 1; i++) {
 			for (size_t j = 0; j < 5; j++) {
 				ut8cptosb(&sb, WordleRuCodeToCP(wordle->words[i * 5 + j]));
@@ -257,6 +264,7 @@ defer:
 					nob_sb_appendf(&sb, "🟩");
 					break;
 				default:
+					//NOB_UNREACHABLE("^here");
 					nob_sb_appendf(&sb, "⬜️");
 					break;
 				}
