@@ -197,6 +197,7 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 		wordle->words[wordle->word_index * 5 + counter] = rc;
 		if (rc == (uint8_t)-1) { nob_return_defer(false); }
 		if (rc == wordle->word[counter]) {
+			//printf("rc=%d,word[counter]=%d\n", rc, wordle->word[counter]);
 			wordle->tiles[wordle->word_index * 5 + counter] = 3;
 		} else {
 			for (size_t j = 0; j < 5; j++) {
@@ -231,22 +232,10 @@ defer:
 			//TGBotSendText(chat_id, "No such word in dictionary.");
 		}
 	} else {
-		if (wordle->word_index == 6) {
-			nob_sb_appendf(&sb, "Попытки кончились. Ответ: '");
-			//nob_sb_appendf(&sb, "No more tries. Answer: '");
-			for (size_t j = 0; j < 5; j++) {
-				ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
-			}
-			nob_sb_appendf(&sb, "'");
-			nob_sb_append_null(&sb);
-			TGBotSendText(chat_id, sb.items);
-			return true;
-		}
-		wordle->word_index++;
 		nob_sb_appendf(&sb, "Слово существует:\n");
 		//nob_sb_appendf(&sb, "Word exists:\n");
 		nob_sb_appendf(&sb, "```txt\n");
-		for (size_t i = 0; i < wordle->word_index; i++) {
+		for (size_t i = 0; i < wordle->word_index + 1; i++) {
 			for (size_t j = 0; j < 5; j++) {
 				ut8cptosb(&sb, WordleRuCodeToCP(wordle->words[i * 5 + j]));
 			}
@@ -272,7 +261,7 @@ defer:
 		nob_sb_appendf(&sb, "```\n");
 		bool guessed_right = true;
 		for (size_t i = 0; i < 5; i++) {
-			if (wordle->tiles[(wordle->word_index - 1) * 5 + i] != 3) {
+			if (wordle->tiles[wordle->word_index * 5 + i] != 3) {
 				guessed_right = false;
 				break;
 			}
@@ -288,6 +277,19 @@ defer:
 		nob_sb_append_null(&sb);
 		TGBotSendTextMD(chat_id, sb.items);
 		if (guessed_right) { return true; }
+		if (wordle->word_index == 5) {
+			sb.count = 0;
+			nob_sb_appendf(&sb, "Попытки кончились. Ответ: '");
+			//nob_sb_appendf(&sb, "No more tries. Answer: '");
+			for (size_t j = 0; j < 5; j++) {
+				ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
+			}
+			nob_sb_appendf(&sb, "'");
+			nob_sb_append_null(&sb);
+			TGBotSendText(chat_id, sb.items);
+			return true;
+		}
+		wordle->word_index++;
 	}
 	nob_sb_free(sb);
 	return false;
