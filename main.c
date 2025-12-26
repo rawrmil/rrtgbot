@@ -96,31 +96,38 @@ TGB_Chat* TGBotGetChatById(int id) {
 bool HandleUserCommand(TGB_Chat* chat, char* text) {
 	if (strcmp(text, "/echo") == 0) {
 		chat->mode = TGB_CM_ECHO;
-		TGBotSendText(chat->id, "To exit echo mode type /exit");
+		TGBotSendText(chat->id, "Чтобы выйти напишите /exit");
+		//TGBotSendText(chat->id, "To exit echo mode type /exit");
 		return true;
 	}
 	if (strcmp(text, "/foo") == 0) {
-		TGBotSendText(chat->id, "bar");
+		TGBotSendText(chat->id, "бар");
+		//TGBotSendText(chat->id, "bar");
 		return true;
 	}
 	if (strcmp(text, "/wordle") == 0) {
 		chat->mode = TGB_CM_WORDLE;
 		chat->mode_data = WordleInit();
 		if (chat->mode_data == NULL) {
-			TGBotSendText(chat->id, "Wordle game internal error.");
+			TGBotSendText(chat->id, "Внутренняя ошибка Вордл.");
+			//TGBotSendText(chat->id, "Wordle game internal error.");
 			return true;
 		}
-		TGBotSendText(chat->id, "Wordle game started. To exit type /exit");
+		TGBotSendText(chat->id, "Игра Вордл началась. Чтобы выйти напишите /exit");
+		//TGBotSendText(chat->id, "Wordle game started. To exit type /exit");
 		return true;
 	}
-	TGBotSendText(chat->id, "Unknown command.");
+	TGBotSendText(chat->id, "Неизвестная команда.");
+	//TGBotSendText(chat->id, "Unknown command.");
 	return false;
 }
 
 void HandleCommandExit(TGB_Chat* chat) {
 	switch (chat->mode) {
-		case TGB_CM_ECHO: TGBotSendText(chat->id, "Exited echo."); break;
-		case TGB_CM_WORDLE: TGBotSendText(chat->id, "Exited Wordle."); break;
+		case TGB_CM_ECHO: TGBotSendText(chat->id, "Выход из '/echo'."); break;
+		//case TGB_CM_ECHO: TGBotSendText(chat->id, "Exited echo."); break;
+		case TGB_CM_WORDLE: TGBotSendText(chat->id, "Выход из Вордла."); break;
+		//case TGB_CM_WORDLE: TGBotSendText(chat->id, "Exited Wordle."); break;
 	}
 	free(chat->mode_data);
 	chat->mode_data = NULL;
@@ -164,8 +171,10 @@ void HandleUpdate(cJSON* update) {
 	}
 
 	if (chat->mode == TGB_CM_DEFAULT) {
-		if (text[0] != '/' || !HandleUserCommand(chat, text)) {
-			TGBotSendText(chat_id, "Unknown command.");
+		if (text[0] == '/') { HandleUserCommand(chat, text); }
+		else {
+			TGBotSendText(chat->id, "Команды начинаяются с '/'.");
+			//TGBotSendText(chat->id, "Commands start '/'.");
 		}
 		return;
 	}
@@ -197,6 +206,8 @@ void app_terminate(int sig) {
 }
 
 int main(int argc, char* argv[]) {
+	srand(nob_nanos_since_unspecified_epoch());
+
 	WordleInitWords();
 
 	FlagsParse(argc, argv);

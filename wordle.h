@@ -224,13 +224,16 @@ defer:
 	if (!result) {
 		if (found_word) {
 			// TODO: TGBotSendf
-			TGBotSendText(chat_id, "Error reading the word.");
+			TGBotSendText(chat_id, "Ошибка недопустимое слово.");
+			//TGBotSendText(chat_id, "Error invalid word.");
 		} else {
-			TGBotSendText(chat_id, "No such word in dictionary.");
+			TGBotSendText(chat_id, "Такого слова нет в словаре.");
+			//TGBotSendText(chat_id, "No such word in dictionary.");
 		}
 	} else {
 		if (wordle->word_index == 6) {
-			nob_sb_appendf(&sb, "No more tries. Answer: '");
+			nob_sb_appendf(&sb, "Попытки кончились. Ответ: '");
+			//nob_sb_appendf(&sb, "No more tries. Answer: '");
 			for (size_t j = 0; j < 5; j++) {
 				ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
 			}
@@ -240,7 +243,8 @@ defer:
 			return true;
 		}
 		wordle->word_index++;
-		nob_sb_appendf(&sb, "Word is valid:\n");
+		nob_sb_appendf(&sb, "Слово существует:\n");
+		//nob_sb_appendf(&sb, "Word exists:\n");
 		nob_sb_appendf(&sb, "```txt\n");
 		for (size_t i = 0; i < wordle->word_index; i++) {
 			for (size_t j = 0; j < 5; j++) {
@@ -274,7 +278,8 @@ defer:
 			}
 		}
 		if (guessed_right) {
-				nob_sb_appendf(&sb, "You guessed right! It's '");
+				nob_sb_appendf(&sb, "Ты угадал! Это '");
+				//nob_sb_appendf(&sb, "You guessed right! It's '");
 				for (size_t j = 0; j < 5; j++) {
 					ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
 				}
