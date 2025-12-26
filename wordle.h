@@ -127,10 +127,15 @@ void* WordleInit() {
 	Wordle* wordle = calloc(1, sizeof(*wordle));
 	if (wordle_words.count == 0) { return NULL; }
 	Nob_String_Builder sb = {0};
-	size_t i = rand() % wordle_words.count;
-	for (size_t j = 0; j < 5; j++) {
-		wordle->word[j] = wordle_words.items[i].word[j];
-		ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
+	for (size_t k = 0; k < wordle_words.count; k++) { // Iteration limit
+		size_t i = rand() % wordle_words.count;
+		if (k == wordle_words.count - 1 || wordle_words.items[i].difficulty == 1) {
+			for (size_t j = 0; j < 5; j++) {
+				wordle->word[j] = wordle_words.items[i].word[j];
+				ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
+			}
+			break;
+		}
 	}
 	MG_INFO(("WORD: %.*s\n", (int)sb.count, sb.items));
 	nob_sb_free(sb);
