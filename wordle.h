@@ -33,10 +33,10 @@ void* WordleInit() {
 }
 
 size_t ut8cplen(uint8_t c) {
-	if ((c & 0x80) == 0x00) { return 1; }
-	if ((c & 0xE0) == 0xC0) { return 2; }
-	if ((c & 0xF0) == 0xE0) { return 3; }
-	if ((c & 0xF8) == 0xF0) { return 4; }
+	if ((c & 0x80) == 0x00) { return 1; } // 0xxxxxxx
+	if ((c & 0xE0) == 0xC0) { return 2; } // 001xxxxx
+	if ((c & 0xF0) == 0xE0) { return 3; } // 0001xxxx
+	if ((c & 0xF8) == 0xF0) { return 4; } // 00001xxx
 	return 0;
 }
 
@@ -59,6 +59,42 @@ size_t ut8cp(char* buf, size_t len, uint32_t* cp_out) {
 	return l;
 }
 
+size_t ut8cptobuf(uint32_t cp, uint8_t* out) {
+	if (cp <= 0x7F) {
+		// out: 0xxx'xxxx
+		out[0] = (uint8_t)cp;
+		return 1;
+	} else if (cp <= 0x07FF) {
+		// out: 110x'xxxx 10xx'xxxx
+		out[0] = (0xC0) | (cp >> 6);
+		out[1] = (0x80) | (cp & 0x3F);
+		return 2;
+	} else if (cp <= 0xFFFF) {
+		// U+D800 - U+0FFF: surrogate pairs for UTF-16
+		if (cp >= 0xD800 && cp <= 0xDFFF) { return 0; }
+		// out: 1110'xxxx 10xx'xxxx 10xx'xxxx
+		out[0] = 0xE0 | (cp >> 12);
+		out[1] = 0x80 | ((cp >> 6) & 0x3F);
+		out[2] = 0x80 | (cp & 0x3F);
+		return 3;
+	} else if (cp <= 0x0010FFFF) {
+		// out: 1111'0xxx 10xx'xxxx 10xx'xxxx 10xx'xxxx
+		out[0] = 0xF0 | (cp >> 18);
+		out[1] = 0x80 | ((cp >> 12) & 0x3F);
+		out[2] = 0x80 | ((cp >> 6) & 0x3F);
+		out[3] = 0x80 | (cp & 0x3f);
+		return 4;
+	}
+}
+
+bool ut8cptosb(Nob_String_Builder* sb, uint32_t cp) {
+	uint8_t out[4];
+	size_t len;
+	len = ut8cptobuf(cp, out);
+	if (len == 0) { return false; }
+	nob_da_append_many(sb, out, len);
+}
+
 uint8_t WordleCPToRuCode(uint32_t cp) {
 	// а - 0, б - 1, в - 2, ..., я = 31, ё - 32
 	if (cp == (uint32_t)-1) { return (uint8_t)-1; }
@@ -67,6 +103,13 @@ uint8_t WordleCPToRuCode(uint32_t cp) {
 	if (cp >= 0x410 && cp <= 0x42f) { rc = cp - 0x410; }
 	if (cp == 0x451 || cp == 0x401) { rc = 32; }
 	return rc;
+}
+
+uint32_t WordleRuCodeToCP(uint8_t rc) {
+	// а - 0, б - 1, в - 2, ..., я = 31, ё - 32
+	if (rc > 32) { return (uint32_t)-1; }
+	if (rc != 32) { return 0x430 + rc; }
+	return 0x451;
 }
 
 void WordleMessage(int chat_id, char* text, void* data) {
@@ -81,6 +124,9 @@ void WordleMessage(int chat_id, char* text, void* data) {
 		//mg_hexdump(&word.buf[i], word.len - i);
 		uint8_t rc = WordleCPToRuCode(cp);
 		//printf("rc=%lu\n", rc);
+		uint8_t out[4];
+		size_t l = ut8cptobuf(WordleRuCodeToCP(rc), out);
+		printf("letter=%.*s\n", (int)l, out);
 		if (rc == (uint8_t)-1) { nob_return_defer(false); }
 		if (rc == wordle->word[counter]) {
 			wordle->tiles[wordle->word_index * 5 + counter] = 3;
@@ -93,12 +139,15 @@ void WordleMessage(int chat_id, char* text, void* data) {
 			}
 		}
 		counter++;
+		if (counter > 5) { nob_return_defer(false); }
 	}
 	printf("\n");
 	nob_temp_reset();
 	if (counter != 5) { nob_return_defer(false); }
 defer:
+	Nob_String_Builder sb = {0};
 	if (!result) {
+		// TODO: TGBotSendf
 		TGBotSendText(chat_id, "Error reading the word.");
 	} else {
 		if (wordle->word_index == 6) {
@@ -106,7 +155,6 @@ defer:
 			return;
 		}
 		wordle->word_index++;
-		Nob_String_Builder sb = {0};
 		nob_sb_appendf(&sb, "Word is valid:\n");
 		nob_sb_appendf(&sb, "```txt\n");
 		for (size_t i = 0; i < wordle->word_index; i++) {
@@ -132,8 +180,8 @@ defer:
 		nob_sb_appendf(&sb, "```\n");
 		nob_sb_append_null(&sb);
 		TGBotSendTextMD(chat_id, sb.items);
-		nob_sb_free(sb);
 	}
+	nob_sb_free(sb);
 }
 
 #endif /* WORDLE_IMPLEMENTATION */
