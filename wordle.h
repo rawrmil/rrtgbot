@@ -8,6 +8,7 @@
 typedef struct Wordle {
 	uint8_t word_index;
 	uint8_t word[5];
+	uint8_t words[30]; // 5 * 6
 	uint8_t tiles[30]; // 5 * 6
 	// 0 - unknown
 	// 1 - letter doesn't exist
@@ -123,10 +124,11 @@ void WordleMessage(int chat_id, char* text, void* data) {
 		if (counter >= 6) { nob_return_defer(false); }
 		//mg_hexdump(&word.buf[i], word.len - i);
 		uint8_t rc = WordleCPToRuCode(cp);
+		wordle->words[wordle->word_index * 5 + counter] = rc;
 		//printf("rc=%lu\n", rc);
-		uint8_t out[4];
-		size_t l = ut8cptobuf(WordleRuCodeToCP(rc), out);
-		printf("letter=%.*s\n", (int)l, out);
+		//uint8_t out[4];
+		//size_t l = ut8cptobuf(WordleRuCodeToCP(rc), out);
+		//printf("letter=%.*s\n", (int)l, out);
 		if (rc == (uint8_t)-1) { nob_return_defer(false); }
 		if (rc == wordle->word[counter]) {
 			wordle->tiles[wordle->word_index * 5 + counter] = 3;
@@ -158,7 +160,10 @@ defer:
 		nob_sb_appendf(&sb, "Word is valid:\n");
 		nob_sb_appendf(&sb, "```txt\n");
 		for (size_t i = 0; i < wordle->word_index; i++) {
-			nob_sb_appendf(&sb, "abcde -> ");
+			for (size_t j = 0; j < 5; j++) {
+				ut8cptosb(&sb, WordleRuCodeToCP(wordle->words[i * 5 + j]));
+			}
+			nob_sb_appendf(&sb, " -> ");
 			for (size_t j = 0; j < 5; j++) {
 				switch (wordle->tiles[i * 5 + j]) {
 				case 1:
