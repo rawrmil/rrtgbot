@@ -117,7 +117,7 @@ void TGBotSendTextMD(uint64_t chat_id, char* text) {
 	TGBotMsgStackAdd(TGB_MT_SEND_MESSAGE);
 	cJSON *msg_json = cJSON_CreateObject();
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", chat_id)));
-	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "parse_mode", "MarkdownV2"));
+	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "parse_mode", "Markdown"));
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", text));
 	char* msg_str = cJSON_PrintUnformatted(msg_json);
 	TGBotAPISendJSON("POST", "sendMessage", msg_str, strlen(msg_str));

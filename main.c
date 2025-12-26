@@ -176,7 +176,7 @@ void HandleUpdate(cJSON* update) {
 			TGBotSendText(chat_id, text);
 			break;
 		case TGB_CM_WORDLE:
-			WordleMessage(chat_id, text, chat->mode_data);
+			if (WordleMessage(chat_id, text, chat->mode_data)) { HandleCommandExit(chat); }
 			break;
 	}
 }
