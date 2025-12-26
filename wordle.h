@@ -206,6 +206,22 @@ void WordleAppendTile(Nob_String_Builder* sb, uint8_t t) {
 	}
 }
 
+void WordleSendTried(int chat_id, Wordle* wordle) {
+	Nob_String_Builder sb = {0};
+	nob_sb_appendf(&sb, "Буквы: ");
+	for (size_t i = 0; i < 33; i++) {
+		if (wordle->tried[i] != 1) {
+			ut8cptosb(&sb, WordleRuCodeToCP(i));
+			WordleAppendTile(&sb, wordle->tried[i]);
+			nob_sb_appendf(&sb, "; ");
+		}
+	}
+	nob_sb_appendf(&sb, "\n");
+	nob_sb_append_null(&sb);
+	TGBotSendText(chat_id, sb.items);
+	nob_sb_free(sb);
+}
+
 bool WordleMessage(int chat_id, char* text, void* data) {
 	bool result = true;
 	Wordle* wordle = (Wordle*)data;
@@ -274,7 +290,6 @@ defer:
 			nob_sb_appendf(&sb, "\n");
 		}
 		nob_sb_appendf(&sb, "```\n");
-		nob_sb_appendf(&sb, "Буквы: ");
 		bool guessed_right = true;
 		for (size_t i = 0; i < 5; i++) {
 			if (wordle->tiles[wordle->word_index * 5 + i] != 3) {
@@ -289,15 +304,6 @@ defer:
 					ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
 				}
 				nob_sb_appendf(&sb, "'");
-		} else {
-			for (size_t i = 0; i < 33; i++) {
-				if (wordle->tried[i] != 1) {
-					ut8cptosb(&sb, WordleRuCodeToCP(i));
-					WordleAppendTile(&sb, wordle->tried[i]);
-					nob_sb_appendf(&sb, "; ");
-				}
-			}
-			nob_sb_appendf(&sb, "\n");
 		}
 		nob_sb_append_null(&sb);
 		TGBotSendTextMD(chat_id, sb.items);
@@ -315,6 +321,7 @@ defer:
 			return true;
 		}
 		wordle->word_index++;
+		WordleSendTried(chat_id, wordle);
 	}
 	nob_sb_free(sb);
 	return false;
