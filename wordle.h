@@ -297,6 +297,18 @@ void WordleSendTriedLetters(int chat_id, Wordle* wordle) {
 	nob_sb_free(sb);
 }
 
+void WordleSendGuessedRight(int chat_id, Wordle* wordle) {
+	Nob_String_Builder sb = {0};
+	nob_sb_appendf(&sb, "Ты угадал! Это '");
+	for (size_t j = 0; j < 5; j++) {
+		ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
+	}
+	nob_sb_appendf(&sb, "'");
+	nob_sb_append_null(&sb);
+	TGBotSendTextMD(chat_id, sb.items);
+	nob_sb_free(sb);
+}
+
 bool WordleMessage(int chat_id, char* text, void* data) {
 	bool result = true;
 	bool all_match;
@@ -316,15 +328,8 @@ defer:
 	} else {
 		WordleSendTried(chat_id, wordle);
 		if (all_match) {
-				nob_sb_appendf(&sb, "Ты угадал! Это '");
-				//nob_sb_appendf(&sb, "You guessed right! It's '");
-				for (size_t j = 0; j < 5; j++) {
-					ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
-				}
-				nob_sb_appendf(&sb, "'");
+			WordleSendGuessedRight(chat_id, wordle);
 		}
-		nob_sb_append_null(&sb);
-		TGBotSendTextMD(chat_id, sb.items);
 		if (all_match) { return true; }
 		if (wordle->word_index == 5) {
 			sb.count = 0;
