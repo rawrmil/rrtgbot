@@ -96,6 +96,7 @@ size_t ut8cptobuf(uint32_t cp, uint8_t* out) {
 		out[3] = 0x80 | (cp & 0x3f);
 		return 4;
 	}
+	return 0;
 }
 
 bool ut8cptosb(Nob_String_Builder* sb, uint32_t cp) {
