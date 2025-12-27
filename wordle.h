@@ -331,6 +331,7 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 	all_match = WordleFillTiles(wordle);
 defer:
 	Nob_String_Builder sb = {0};
+	bool end = false;
 	if (!result) {
 		for (size_t j = 0; j < 5; j++) {
 			wordle->tiles[wordle->word_index * 5 + j] = 0;
@@ -342,17 +343,18 @@ defer:
 		WordleSendTried(chat_id, wordle);
 		if (all_match) {
 			WordleSendGuessedRight(chat_id, wordle);
-		}
-		if (all_match) { return true; }
-		if (wordle->word_index == 5) {
+			end = true;
+		} else if (wordle->word_index == 5) {
 			WordleSendGameOver(chat_id, wordle);
-			return true;
+			end = true;
 		}
-		wordle->word_index++;
-		WordleSendTriedLetters(chat_id, wordle);
+		if (!end) {
+			wordle->word_index++;
+			WordleSendTriedLetters(chat_id, wordle);
+		}
 	}
 	nob_sb_free(sb);
-	return false;
+	return end;
 }
 
 #endif /* WORDLE_IMPLEMENTATION */
