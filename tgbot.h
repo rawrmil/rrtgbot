@@ -109,6 +109,7 @@ void TGBotSendText(uint64_t chat_id, char* text) {
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", text));
 	char* msg_str = cJSON_PrintUnformatted(msg_json);
 	TGBotAPISendJSON("POST", "sendMessage", msg_str, strlen(msg_str));
+	cJSON_Delete(msg_json);
 	free(msg_str);
 	nob_temp_reset();
 }
@@ -121,6 +122,7 @@ void TGBotSendTextMD(uint64_t chat_id, char* text) {
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", text));
 	char* msg_str = cJSON_PrintUnformatted(msg_json);
 	TGBotAPISendJSON("POST", "sendMessage", msg_str, strlen(msg_str));
+	cJSON_Delete(msg_json);
 	free(msg_str);
 	nob_temp_reset();
 }
@@ -162,6 +164,7 @@ void TGBotHandleTelegramMessage(struct mg_connection* c, void* ev_data) {
 	tgb.fn(update);
 defer:
 	mg_http_reply(c, result, "", "");
+	cJSON_Delete(update);
 }
 
 void TGBotWebhookEventHandler(struct mg_connection* c, int ev, void* ev_data) {
@@ -231,6 +234,7 @@ void TGBotConnect(struct mg_mgr* mgr, TGB_HandleUpdate fn) {
 	}
 	tgb.fn = fn;
 	tgb.conn = mg_http_connect(mgr, TGBOT_API_URL, TGBotEventHandler, NULL);
+	nob_sb_free(sb);
 }
 
 void TGBotClose() {
