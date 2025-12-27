@@ -164,6 +164,7 @@ void TGBotHandleTelegramMessage(struct mg_connection* c, void* ev_data) {
 	tgb.fn(update);
 defer:
 	mg_http_reply(c, result, "", "");
+	cJSON_Delete(update);
 }
 
 void TGBotWebhookEventHandler(struct mg_connection* c, int ev, void* ev_data) {
