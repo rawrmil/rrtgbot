@@ -242,6 +242,7 @@ int main(int argc, char* argv[]) {
 	mg_mgr_free(&mgr);
 	printf("Server closed.\n");
 	TGBotClose();
+	nob_da_free(wordle_words);
 
 	return 0;
 }
