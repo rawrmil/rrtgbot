@@ -309,6 +309,19 @@ void WordleSendGuessedRight(int chat_id, Wordle* wordle) {
 	nob_sb_free(sb);
 }
 
+void WordleSendGameOver(int chat_id, Wordle* wordle) {
+	Nob_String_Builder sb = {0};
+	nob_sb_appendf(&sb, "Попытки кончились. Ответ: '");
+	//nob_sb_appendf(&sb, "No more tries. Answer: '");
+	for (size_t j = 0; j < 5; j++) {
+		ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
+	}
+	nob_sb_appendf(&sb, "'");
+	nob_sb_append_null(&sb);
+	TGBotSendText(chat_id, sb.items);
+	nob_sb_free(sb);
+}
+
 bool WordleMessage(int chat_id, char* text, void* data) {
 	bool result = true;
 	bool all_match;
@@ -332,15 +345,7 @@ defer:
 		}
 		if (all_match) { return true; }
 		if (wordle->word_index == 5) {
-			sb.count = 0;
-			nob_sb_appendf(&sb, "Попытки кончились. Ответ: '");
-			//nob_sb_appendf(&sb, "No more tries. Answer: '");
-			for (size_t j = 0; j < 5; j++) {
-				ut8cptosb(&sb, WordleRuCodeToCP(wordle->word[j]));
-			}
-			nob_sb_appendf(&sb, "'");
-			nob_sb_append_null(&sb);
-			TGBotSendText(chat_id, sb.items);
+			WordleSendGameOver(chat_id, wordle);
 			return true;
 		}
 		wordle->word_index++;
