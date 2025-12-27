@@ -222,9 +222,7 @@ void WordleSendTried(int chat_id, Wordle* wordle) {
 	nob_sb_free(sb);
 }
 
-bool WordleMessage(int chat_id, char* text, void* data) {
-	bool result = true;
-	Wordle* wordle = (Wordle*)data;
+bool WordleReadWord(Wordle* wordle, char* text) {
 	struct mg_str word = mg_str(text);
 	size_t counter = 0;
 	uint32_t cp;
@@ -233,13 +231,16 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 		//mg_hexdump(&word.buf[i], word.len - i);
 		uint8_t rc = WordleCPToRuCode(cp);
 		wordle->words[wordle->word_index * 5 + counter] = rc;
-		if (rc == (uint8_t)-1) { nob_return_defer(false); }
+		if (rc == (uint8_t)-1) { return false; }
 		//printf("rc=%d,word[%d]=%d\n", rc, counter, wordle->word[counter]);
 		counter++;
 		if (counter == 5) { break; }
 	}
-	nob_temp_reset();
-	if (counter != 5) { nob_return_defer(false); }
+	if (counter != 5) { return false; }
+	return true;
+}
+
+bool WordleWordExist(Wordle* wordle) {
 	bool found_word = false;
 	for (size_t i = 0; i < wordle_words.count; i++) {
 		if (memcmp(&wordle->words[wordle->word_index * 5], wordle_words.items[i].word, 5) == 0) {
@@ -247,14 +248,19 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 			break;
 		}
 	}
-	if (!found_word) { nob_return_defer(false); }
+	return found_word;
+}
+
+bool WordleFillTiles(Wordle* wordle) {
+	bool all_match = true;
 	for (size_t i = 0; i < 5; i++) {
 		uint8_t rc = wordle->words[wordle->word_index * 5 + i];
-		if (rc > 32) { NOB_UNREACHABLE("rc > 32"); }
+		//if (rc > 32) { NOB_UNREACHABLE("rc > 32"); }
 		wordle->tiles[wordle->word_index * 5 + i] = 1;
 		if (rc == wordle->word[i]) {
 			wordle->tiles[wordle->word_index * 5 + i] = 3;
 		} else {
+			all_match = false;
 			for (size_t j = 0; j < 5; j++) {
 				if (rc == wordle->word[j]) {
 					wordle->tiles[wordle->word_index * 5 + i] = 2;
@@ -265,6 +271,16 @@ bool WordleMessage(int chat_id, char* text, void* data) {
 		uint8_t tile_status = wordle->tiles[wordle->word_index * 5 + i];
 		if (tile_status > wordle->tried[rc]) { wordle->tried[rc] = tile_status; }
 	}
+	return all_match;
+}
+
+bool WordleMessage(int chat_id, char* text, void* data) {
+	bool result = true;
+	bool all_match;
+	Wordle* wordle = (Wordle*)data;
+	if (!WordleReadWord(wordle, text)) { nob_return_defer(false); }
+	if (!WordleWordExist(wordle)) { nob_return_defer(false); }
+	all_match = WordleFillTiles(wordle);
 defer:
 	Nob_String_Builder sb = {0};
 	if (!result) {
@@ -291,14 +307,7 @@ defer:
 			nob_sb_appendf(&sb, "\n");
 		}
 		nob_sb_appendf(&sb, "```\n");
-		bool guessed_right = true;
-		for (size_t i = 0; i < 5; i++) {
-			if (wordle->tiles[wordle->word_index * 5 + i] != 3) {
-				guessed_right = false;
-				break;
-			}
-		}
-		if (guessed_right) {
+		if (all_match) {
 				nob_sb_appendf(&sb, "Ты угадал! Это '");
 				//nob_sb_appendf(&sb, "You guessed right! It's '");
 				for (size_t j = 0; j < 5; j++) {
@@ -308,7 +317,7 @@ defer:
 		}
 		nob_sb_append_null(&sb);
 		TGBotSendTextMD(chat_id, sb.items);
-		if (guessed_right) { return true; }
+		if (all_match) { return true; }
 		if (wordle->word_index == 5) {
 			sb.count = 0;
 			nob_sb_appendf(&sb, "Попытки кончились. Ответ: '");
