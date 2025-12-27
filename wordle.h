@@ -283,10 +283,11 @@ bool WordleSendTried(int chat_id, Wordle* wordle) {
 }
 
 void WordleSendTriedLetters(int chat_id, Wordle* wordle) {
+	return;
 	Nob_String_Builder sb = {0};
 	nob_sb_appendf(&sb, "Буквы: ");
 	for (size_t i = 0; i < 33; i++) {
-		if (wordle->tried[i] > 0) {
+		if (wordle->tried[i] != 1) {
 			ut8cptosb(&sb, WordleRuCodeToCP(i));
 			WordleAppendTile(&sb, wordle->tried[i]);
 			nob_sb_appendf(&sb, "; ");
