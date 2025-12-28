@@ -25,6 +25,7 @@ int main(int argc, char** argv) {
 
 	cmd_append(&cmd,
 			"cc", "main.c", "3rd_party/cJSON/cJSON.c", "-o", "out/rrtgbot",
+			"-fsanitize=address,undefined",
 			"out/mongoose.o",
 			"-I./3rd_party");
 	if (!cmd_run(&cmd)) return 1;

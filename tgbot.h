@@ -28,6 +28,7 @@ typedef void (*TGB_HandleUpdate)(cJSON*);
 
 typedef struct TGB_Bot {
 	struct mg_connection* conn;
+	bool is_connected;
 	TGB_HandleUpdate fn;
 	uint64_t last_poll_ms;
 	uint64_t update_offset;
@@ -55,6 +56,7 @@ char* TGB_MSG_TYPE_NAMES[] = { X_TGB_MSG_TYPE };
 TGB_Bot tgb;
 
 void TGBotAPISendJSON(char* method, char* action, char* buf, size_t len) {
+	if (!tgb.is_connected) { MG_ERROR(("tg not connected")); return; } // TODO: add to queue
 	char* msg = nob_temp_sprintf(
 			"%s /bot"TGBOT_API_TOKEN"/%s HTTP/1.1\r\n"
 			"Host: "TGBOT_API_HOST"\r\n"
@@ -198,6 +200,7 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 			break;
 		case MG_EV_TLS_HS:
 			MG_INFO(("HANDSHAKE\n"));
+			tgb.is_connected = true;
 			TGBotSendText(TGBOT_ADMIN_CHAT_ID, "Server started.");
 			TGBotSendGetWebhookInfo();
 #ifdef TGBOT_WEBHOOK_URL
@@ -216,6 +219,11 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 				TGBotHandleTelegramResponse(ev_data);
 			}
 #endif
+			break;
+		case MG_EV_CLOSE:
+			MG_INFO(("CLOSE\n"));
+			tgb.is_connected = false;
+			TGBotConnect(c->mgr, tgb.fn);
 			break;
 		case MG_EV_ERROR:
 			MG_INFO(("ERROR '%s'\n", ev_data));
