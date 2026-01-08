@@ -28,7 +28,7 @@ typedef void (*TGB_HandleUpdate)(cJSON*);
 
 typedef struct TGB_RespQueue {
 	TGB_RespType buf[TGB_QUEUE_CAPACITY];
-	int len;
+	size_t head, tail;
 } TGB_RespQueue;
 
 typedef struct TGB_Bot {
@@ -74,17 +74,16 @@ void TGBotAPISendJSON(char* method, char* action, char* buf, size_t len) {
 }
 
 void TGBotRespQueueAdd(TGB_RespType resp_type) {
-	if (tgb.resp.len >= TGB_QUEUE_CAPACITY) { MG_ERROR(("msg queue overflow")); }
-	tgb.resp.buf[tgb.resp.len++] = resp_type;
+	size_t last_tail = tgb.resp.tail;
+	tgb.resp.tail = (tgb.resp.tail + 1) % TGB_QUEUE_CAPACITY;
+	if (tgb.resp.tail == tgb.resp.head) { MG_ERROR(("msg queue overflow")); }
+	tgb.resp.buf[last_tail] = resp_type;
 }
 
-TGB_RespType TGBotRespQueuePop() { // TODO: use real queue
-	if (tgb.resp.len == 0) { return TGB_MT_UNKNOWN; }
-	TGB_RespType resp_type = tgb.resp.buf[0];
-	for (size_t i = 0; i < tgb.resp.len - 1; i++) {
-		tgb.resp.buf[i] = tgb.resp.buf[i + 1];
-	}
-	tgb.resp.len--;
+TGB_RespType TGBotRespQueuePop() {
+	if (tgb.resp.head == tgb.resp.tail) { return TGB_MT_UNKNOWN; }
+	TGB_RespType resp_type = tgb.resp.buf[tgb.resp.head];
+	tgb.resp.head = (tgb.resp.head + 1) % TGB_QUEUE_CAPACITY;
 	return resp_type;
 }
 
