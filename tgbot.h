@@ -7,7 +7,7 @@
 #define TGBOT_API_HOST "api.telegram.org"
 #define TGBOT_API_URL "https://"TGBOT_API_HOST"/"
 
-#define X_TGB_MSG_TYPE \
+#define X_TGB_RESP_TYPE \
 	X(TGB_MT_UNKNOWN) \
 	X(TGB_MT_SEND_MESSAGE) \
 	X(TGB_MT_GET_UPDATES) \
@@ -17,14 +17,19 @@
 	X(TGB_MT_LENGTH)
 
 #define X(name_) name_,
-typedef enum TGB_MsgType {
-	X_TGB_MSG_TYPE
-} TGB_MsgType;
+typedef enum TGB_RespType {
+	X_TGB_RESP_TYPE
+} TGB_RespType;
 #undef X
 
-#define TGB_MSG_STACK_CAPACITY 256
+#define TGB_QUEUE_CAPACITY 256
 
 typedef void (*TGB_HandleUpdate)(cJSON*);
+
+typedef struct TGB_RespQueue {
+	TGB_RespType buf[TGB_QUEUE_CAPACITY];
+	int len;
+} TGB_RespQueue;
 
 typedef struct TGB_Bot {
 	struct mg_connection* conn;
@@ -32,8 +37,7 @@ typedef struct TGB_Bot {
 	TGB_HandleUpdate fn;
 	uint64_t last_poll_ms;
 	uint64_t update_offset;
-	TGB_MsgType msg_queue[TGB_MSG_STACK_CAPACITY];
-	int msg_queue_len;
+	TGB_RespQueue resp;
 } TGB_Bot;
 
 extern TGB_Bot tgb;
@@ -50,7 +54,7 @@ void TGBotSendTextMD(uint64_t chat_id, char* text);
 #ifdef TGBOT_IMPLEMENTATION
 
 #define X(name_) #name_,
-char* TGB_MSG_TYPE_NAMES[] = { X_TGB_MSG_TYPE };
+char* TGB_RESP_TYPE_NAMES[] = { X_TGB_RESP_TYPE };
 #undef X
 
 TGB_Bot tgb;
@@ -69,33 +73,33 @@ void TGBotAPISendJSON(char* method, char* action, char* buf, size_t len) {
 	nob_temp_reset();
 }
 
-void TGBotMsgStackAdd(TGB_MsgType msg_type) {
-	if (tgb.msg_queue_len >= TGB_MSG_STACK_CAPACITY) { MG_ERROR(("msg queue overflow")); }
-	tgb.msg_queue[tgb.msg_queue_len++] = msg_type;
+void TGBotRespQueueAdd(TGB_RespType resp_type) {
+	if (tgb.resp.len >= TGB_QUEUE_CAPACITY) { MG_ERROR(("msg queue overflow")); }
+	tgb.resp.buf[tgb.resp.len++] = resp_type;
 }
 
-TGB_MsgType TGBotMsgStackPop() { // TODO: use real queue
-	if (tgb.msg_queue_len == 0) { return TGB_MT_UNKNOWN; }
-	TGB_MsgType msg_type = tgb.msg_queue[0];
-	for (size_t i = 0; i < tgb.msg_queue_len - 1; i++) {
-		tgb.msg_queue[i] = tgb.msg_queue[i + 1];
+TGB_RespType TGBotRespQueuePop() { // TODO: use real queue
+	if (tgb.resp.len == 0) { return TGB_MT_UNKNOWN; }
+	TGB_RespType resp_type = tgb.resp.buf[0];
+	for (size_t i = 0; i < tgb.resp.len - 1; i++) {
+		tgb.resp.buf[i] = tgb.resp.buf[i + 1];
 	}
-	tgb.msg_queue_len--;
-	return msg_type;
+	tgb.resp.len--;
+	return resp_type;
 }
 
 void TGBotSendGetWebhookInfo() {
-	TGBotMsgStackAdd(TGB_MT_GET_WEBHOOK_INFO);
+	TGBotRespQueueAdd(TGB_MT_GET_WEBHOOK_INFO);
 	TGBotAPISendJSON("GET", "getWebhookInfo", "", 0);
 }
 
 void TGBotSendDeleteWebhook() {
-	TGBotMsgStackAdd(TGB_MT_DELETE_WEBHOOK);
+	TGBotRespQueueAdd(TGB_MT_DELETE_WEBHOOK);
 	TGBotAPISendJSON("POST", "deleteWebhook", "", 0);
 }
 
 void TGBotSendGetUpdates() {
-	TGBotMsgStackAdd(TGB_MT_GET_UPDATES);
+	TGBotRespQueueAdd(TGB_MT_GET_UPDATES);
 	char* json =
 		tgb.update_offset == 0 ?
 		nob_temp_sprintf("{}") :
@@ -105,7 +109,7 @@ void TGBotSendGetUpdates() {
 }
 
 void TGBotSendText(uint64_t chat_id, char* text) {
-	TGBotMsgStackAdd(TGB_MT_SEND_MESSAGE);
+	TGBotRespQueueAdd(TGB_MT_SEND_MESSAGE);
 	cJSON *msg_json = cJSON_CreateObject();
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", chat_id)));
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", text));
@@ -117,7 +121,7 @@ void TGBotSendText(uint64_t chat_id, char* text) {
 }
 
 void TGBotSendTextMD(uint64_t chat_id, char* text) {
-	TGBotMsgStackAdd(TGB_MT_SEND_MESSAGE);
+	TGBotRespQueueAdd(TGB_MT_SEND_MESSAGE);
 	cJSON *msg_json = cJSON_CreateObject();
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", chat_id)));
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "parse_mode", "Markdown"));
@@ -182,7 +186,7 @@ void TGBotWebhookEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 
 #ifdef TGBOT_WEBHOOK_URL
 void TGBotSendSetWebhook() { // TODO: do backend in separate file
-	TGBotMsgStackAdd(TGB_MT_SET_WEBHOOK);
+	TGBotRespQueueAdd(TGB_MT_SET_WEBHOOK);
 	mg_http_listen(tgb.conn->mgr, "http://localhost:"TGBOT_WEBHOOK_PORT, TGBotWebhookEventHandler, NULL);
 	char msg[] = "{\"url\":\""TGBOT_WEBHOOK_URL"\",\"secret_token\":\""TGBOT_WEBHOOK_SECRET"\"}";
 	TGBotAPISendJSON("POST", "setWebhook", msg, strlen(msg));
@@ -211,11 +215,11 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 			break;
 		case MG_EV_HTTP_MSG:
 			struct mg_http_message* hm = (struct mg_http_message*)ev_data;
-			TGB_MsgType msg_type = TGBotMsgStackPop();
-			//MG_INFO(("msg_queue_len=%d,msg_type=%s\n", tgb.msg_queue_len, TGB_MSG_TYPE_NAMES[msg_type]));
-			MG_INFO(("%s:%.*s\n", TGB_MSG_TYPE_NAMES[msg_type], hm->body.len, hm->body.buf));
+			TGB_RespType resp_type = TGBotRespQueuePop();
+			//MG_INFO(("resp.len=%d,resp_type=%s\n", tgb.resp.len, TGB_MSG_TYPE_NAMES[resp_type]));
+			MG_INFO(("%s:%.*s\n", TGB_RESP_TYPE_NAMES[resp_type], hm->body.len, hm->body.buf));
 #ifndef TGBOT_WEBHOOK_URL
-			if (msg_type == TGB_MT_GET_UPDATES) {
+			if (resp_type == TGB_MT_GET_UPDATES) {
 				TGBotHandleTelegramResponse(ev_data);
 			}
 #endif
