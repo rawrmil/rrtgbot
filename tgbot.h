@@ -22,7 +22,7 @@ typedef enum TGB_RespType {
 } TGB_RespType;
 #undef X
 
-#define TGB_QUEUE_CAPACITY 256
+#define TGB_QUEUE_CAPACITY 16
 
 typedef void (*TGB_HandleUpdate)(cJSON*);
 
@@ -73,17 +73,30 @@ void TGBotAPISendJSON(char* method, char* action, char* buf, size_t len) {
 	nob_temp_reset();
 }
 
+#define TGB_QUEUE_ADD(q_, el_) \
+	do { \
+		(q_)->buf[(q_)->tail] = (el_); \
+		(q_)->tail = ((q_)->tail + 1) % TGB_QUEUE_CAPACITY; \
+		if ((q_)->tail == (q_)->head) { MG_ERROR(("msg queue overflow")); } \
+	} while(0);
+
+#define TGB_QUEUE_POP(q_, el_, def_) \
+	do { \
+		if ((q_)->head == (q_)->tail) { \
+			*(el_) = (def_); \
+			break; \
+		} \
+		*(el_) = (q_)->buf[(q_)->head]; \
+		(q_)->head = ((q_)->head + 1) % TGB_QUEUE_CAPACITY; \
+	} while(0);
+
 void TGBotRespQueueAdd(TGB_RespType resp_type) {
-	size_t last_tail = tgb.resp.tail;
-	tgb.resp.tail = (tgb.resp.tail + 1) % TGB_QUEUE_CAPACITY;
-	if (tgb.resp.tail == tgb.resp.head) { MG_ERROR(("msg queue overflow")); }
-	tgb.resp.buf[last_tail] = resp_type;
+	TGB_QUEUE_ADD(&tgb.resp, resp_type);
 }
 
 TGB_RespType TGBotRespQueuePop() {
-	if (tgb.resp.head == tgb.resp.tail) { return TGB_MT_UNKNOWN; }
-	TGB_RespType resp_type = tgb.resp.buf[tgb.resp.head];
-	tgb.resp.head = (tgb.resp.head + 1) % TGB_QUEUE_CAPACITY;
+	TGB_RespType resp_type;
+	TGB_QUEUE_POP(&tgb.resp, &resp_type, TGB_MT_UNKNOWN);
 	return resp_type;
 }
 
@@ -134,7 +147,7 @@ void TGBotSendTextMD(uint64_t chat_id, char* text) {
 
 void TGBotPoll() {
 	uint64_t now = mg_millis();
-	if (now - tgb.last_poll_ms > 2000) {
+	if (now - tgb.last_poll_ms > 3000) {
 		MG_INFO(("POLL\n"));
 		TGBotSendGetUpdates();
 		tgb.last_poll_ms = now;
@@ -144,7 +157,7 @@ void TGBotPoll() {
 void TGBotHandleTelegramResponse(void* ev_data) {
 	MG_INFO(("MSG\n"));
 	struct mg_http_message* hm = (struct mg_http_message*)ev_data;
-
+	// TODO: fix leaks
 	cJSON* msg = cJSON_ParseWithLength(hm->body.buf, hm->body.len);
 	if (!cJSON_IsObject(msg)) { return; }
 	cJSON* res = cJSON_GetObjectItemCaseSensitive(msg, "result");
@@ -215,7 +228,7 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 		case MG_EV_HTTP_MSG:
 			struct mg_http_message* hm = (struct mg_http_message*)ev_data;
 			TGB_RespType resp_type = TGBotRespQueuePop();
-			//MG_INFO(("resp.len=%d,resp_type=%s\n", tgb.resp.len, TGB_MSG_TYPE_NAMES[resp_type]));
+			MG_INFO(("resp.head=%d,resp.tail=%d\n", tgb.resp.head, tgb.resp.head));
 			MG_INFO(("%s:%.*s\n", TGB_RESP_TYPE_NAMES[resp_type], hm->body.len, hm->body.buf));
 #ifndef TGBOT_WEBHOOK_URL
 			if (resp_type == TGB_MT_GET_UPDATES) {
