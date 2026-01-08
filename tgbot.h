@@ -155,15 +155,16 @@ void TGBotPoll() {
 }
 
 void TGBotHandleTelegramResponse(void* ev_data) {
+	bool result = true;
 	MG_INFO(("MSG\n"));
 	struct mg_http_message* hm = (struct mg_http_message*)ev_data;
-	// TODO: fix leaks
 	cJSON* msg = cJSON_ParseWithLength(hm->body.buf, hm->body.len);
-	if (!cJSON_IsObject(msg)) { return; }
+	if (!cJSON_IsObject(msg)) { nob_return_defer(false); }
 	cJSON* res = cJSON_GetObjectItemCaseSensitive(msg, "result");
-	if (!cJSON_IsArray(res)) { return; }
+	if (!cJSON_IsArray(res)) { nob_return_defer(false); }
 	cJSON* update;
 	cJSON_ArrayForEach(update, res) { tgb.fn(update); }
+defer:
 	cJSON_Delete(msg);
 }
 
