@@ -120,11 +120,20 @@ void TGBotSendGetUpdates() {
 	nob_temp_reset();
 }
 
-void TGBotSendText(uint64_t chat_id, char* text) {
+typedef struct TGB_Msg {
+	int chat_id;
+	char* text;
+	unsigned is_markdown : 1;
+} TGB_Msg;
+
+void TGBotSend(TGB_Msg msg) {
 	TGBotRespQueueAdd(TGB_MT_SEND_MESSAGE);
 	cJSON *msg_json = cJSON_CreateObject();
-	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", chat_id)));
-	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", text));
+	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", msg.chat_id)));
+	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", msg.text));
+	if (msg.is_markdown) {
+		NOB_ASSERT(cJSON_AddStringToObject(msg_json, "parse_mode", "Markdown"));
+	}
 	char* msg_str = cJSON_PrintUnformatted(msg_json);
 	TGBotAPISendJSON("POST", "sendMessage", msg_str, strlen(msg_str));
 	cJSON_Delete(msg_json);
@@ -132,17 +141,12 @@ void TGBotSendText(uint64_t chat_id, char* text) {
 	nob_temp_reset();
 }
 
+void TGBotSendText(uint64_t chat_id, char* text) {
+	TGBotSend((TGB_Msg){ .chat_id = chat_id, .text = text });
+}
+
 void TGBotSendTextMD(uint64_t chat_id, char* text) {
-	TGBotRespQueueAdd(TGB_MT_SEND_MESSAGE);
-	cJSON *msg_json = cJSON_CreateObject();
-	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", chat_id)));
-	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "parse_mode", "Markdown"));
-	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", text));
-	char* msg_str = cJSON_PrintUnformatted(msg_json);
-	TGBotAPISendJSON("POST", "sendMessage", msg_str, strlen(msg_str));
-	cJSON_Delete(msg_json);
-	free(msg_str);
-	nob_temp_reset();
+	TGBotSend((TGB_Msg){ .chat_id = chat_id, .text = text, .is_markdown = true });
 }
 
 void TGBotPoll() {
