@@ -201,12 +201,11 @@ void HandleUpdate(cJSON* update) {
 // --- MAIN ---
 
 bool is_closed;
-uint64_t started_closing;
 
 void app_terminate(int sig) {
 	TGBotSendText(TGBOT_ADMIN_CHAT_ID, "Server closed.");
 	printf("TGBOT: CLOSING\n");
-	started_closing = mg_millis();
+	is_closed = true;
 }
 
 int main(int argc, char* argv[]) {
@@ -232,16 +231,12 @@ int main(int argc, char* argv[]) {
 #ifndef TGBOT_WEBHOOK_URL
 		TGBotPoll();
 #endif
-		uint64_t now = mg_millis();
-		if (started_closing != 0 && now - started_closing > 2000) {
-			is_closed = true;
-		}
 	}
+	TGBotClose(&mgr);
 
 	// Closing
 	mg_mgr_free(&mgr);
 	printf("Server closed.\n");
-	TGBotClose();
 	nob_da_free(wordle_words);
 
 	return 0;

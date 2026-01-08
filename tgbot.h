@@ -245,7 +245,18 @@ void TGBotConnect(struct mg_mgr* mgr, TGB_HandleUpdate fn) {
 	nob_sb_free(sb);
 }
 
-void TGBotClose() {
+void TGBotClose(struct mg_mgr* mgr) {
+	// Send pending messages
+	for (size_t i = 0; i < 3; i++) {
+		mg_mgr_poll(mgr, 1000);
+	}
+	// Drain
+	tgb.is_connected = false;
+	tgb.conn->is_closing = true;
+	for (size_t i = 0; i < 3; i++) {
+		mg_mgr_poll(mgr, 1000);
+	}
+	// Save state
 	bw_temp.count = 0;
 	BWriteU64(&bw_temp, tgb.update_offset);
 	nob_write_entire_file("dbs/tgb_update_offset", bw_temp.items, bw_temp.count);
