@@ -1,5 +1,5 @@
-#ifndef TGBOT_RW_H
-#define TGBOT_RW_H
+#ifndef TGBOT_H
+#define TGBOT_H
 
 #include "binary_rw.h"
 #include "cJSON/cJSON.h"
@@ -51,7 +51,7 @@ void TGBotSendText(uint64_t chat_id, char* text);
 void TGBotSendTextMD(uint64_t chat_id, char* text);
 void TGBotSendTextMDReplyMarkup(uint64_t chat_id, char* text, cJSON* reply_markup);
 
-#endif /* TGBOT_RW_H */
+#endif /* TGBOT_H */
 
 #ifdef TGBOT_IMPLEMENTATION
 
