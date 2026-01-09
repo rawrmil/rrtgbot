@@ -32,6 +32,7 @@ typedef struct TGB_RespQueue {
 } TGB_RespQueue;
 
 typedef struct TGB_Bot {
+	struct mg_mgr* mgr;
 	struct mg_connection* conn;
 	bool is_connected;
 	TGB_HandleUpdate fn;
@@ -58,10 +59,14 @@ void TGBotSendTextMDReplyMarkup(uint64_t chat_id, char* text, cJSON* reply_marku
 char* TGB_RESP_TYPE_NAMES[] = { X_TGB_RESP_TYPE };
 #undef X
 
-TGB_Bot tgb;
+TGB_Bot tgb; // TODO: multiple bots option
 
 void TGBotAPISendJSON(char* method, char* action, char* buf, size_t len) {
-	if (!tgb.is_connected) { MG_ERROR(("tg not connected")); return; } // TODO: add to queue
+	if (!tgb.is_connected) {
+		MG_ERROR(("tgbot disconnected, connecting..."));
+		for (size_t i = 0; i < 3; i++) { mg_mgr_poll(tgb.mgr, 1000); }
+		return;
+	}
 	char* msg = nob_temp_sprintf(
 			"%s /bot"TGBOT_API_TOKEN"/%s HTTP/1.1\r\n"
 			"Host: "TGBOT_API_HOST"\r\n"
@@ -245,7 +250,7 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 		case MG_EV_HTTP_MSG:
 			struct mg_http_message* hm = (struct mg_http_message*)ev_data;
 			TGB_RespType resp_type = TGBotRespQueuePop();
-			MG_INFO(("resp.head=%d,resp.tail=%d\n", tgb.resp.head, tgb.resp.head));
+			//MG_INFO(("resp.head=%d,resp.tail=%d\n", tgb.resp.head, tgb.resp.head));
 			MG_INFO(("%s:%.*s\n", TGB_RESP_TYPE_NAMES[resp_type], hm->body.len, hm->body.buf));
 #ifndef TGBOT_WEBHOOK_URL
 			if (resp_type == TGB_MT_GET_UPDATES) {
@@ -273,21 +278,22 @@ void TGBotConnect(struct mg_mgr* mgr, TGB_HandleUpdate fn) {
 		br.count = sb.count;
 		NOB_ASSERT(BReadU64(&br, &tgb.update_offset));
 	}
+	tgb.mgr = mgr;
 	tgb.fn = fn;
 	tgb.conn = mg_http_connect(mgr, TGBOT_API_URL, TGBotEventHandler, NULL);
 	nob_sb_free(sb);
 }
 
-void TGBotClose(struct mg_mgr* mgr) {
+void TGBotClose() {
 	// Send pending messages
 	for (size_t i = 0; i < 3; i++) {
-		mg_mgr_poll(mgr, 1000);
+		mg_mgr_poll(tgb.mgr, 1000);
 	}
 	// Drain
 	tgb.is_connected = false;
 	tgb.conn->is_closing = true;
 	for (size_t i = 0; i < 3; i++) {
-		mg_mgr_poll(mgr, 1000);
+		mg_mgr_poll(tgb.mgr, 1000);
 	}
 	// Save state
 	bw_temp.count = 0;
