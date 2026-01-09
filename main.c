@@ -34,6 +34,12 @@
 #include "wordle.h"
 #undef WORDLE_IMPLEMENTATION
 
+// --- TESTS ---
+
+#define TESTS_IMPLEMENTATION
+#include "tests.h"
+#undef TESTS_IMPLEMENTATION
+
 // --- UTILS ---
 
 void RandomBytes(void *buf, size_t len) {
@@ -47,7 +53,7 @@ void RandomBytes(void *buf, size_t len) {
 // --- APP ---
 
 struct Flags {
-	// ...
+	bool* tests_mode;
 } flags;
 
 void FlagsParse(int argc, char** argv) {
@@ -55,6 +61,7 @@ void FlagsParse(int argc, char** argv) {
 
 	bool* f_help = flag_bool("help", 0, "help");
 	uint64_t* f_ll = flag_uint64("log-level", 0, "none, error, info, debug, verbose (0, 1, 2, 3, 4)");
+	flags.tests_mode = flag_bool("tests-mode", false, "run tests mode");
 
 	if (!flag_parse(argc, argv)) {
     flag_print_options(stdout);
@@ -225,8 +232,11 @@ int main(int argc, char* argv[]) {
 	srand(nob_nanos_since_unspecified_epoch());
 
 	WordleInitWords();
-
 	FlagsParse(argc, argv);
+	if (*flags.tests_mode) {
+		Tests();
+		return 0;
+	}
 
 	NOB_ASSERT(nob_mkdir_if_not_exists("dbs"));
 

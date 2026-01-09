@@ -31,10 +31,17 @@ typedef struct TGB_RespQueue {
 	size_t head, tail;
 } TGB_RespQueue;
 
+typedef struct TGB_MockingQueue {
+	cJSON* buf[TGB_QUEUE_CAPACITY]; // TODO: custom size frfr
+	size_t head, tail;
+} TGB_MockingQueue;
+
 typedef struct TGB_Bot {
 	struct mg_mgr* mgr;
 	struct mg_connection* conn;
 	bool is_connected;
+	bool is_mocking;
+	TGB_MockingQueue mocking_q;
 	TGB_HandleUpdate fn;
 	uint64_t last_poll_ms;
 	uint64_t update_offset;
@@ -97,10 +104,12 @@ void TGBotAPISendJSON(char* method, char* action, char* buf, size_t len) {
 	} while(0);
 
 void TGBotRespQueueAdd(TGB_RespType resp_type) {
+	if (tgb.is_mocking) { return; }
 	TGB_QUEUE_ADD(&tgb.resp, resp_type);
 }
 
 TGB_RespType TGBotRespQueuePop() {
+	if (tgb.is_mocking) { return TGB_MT_UNKNOWN; }
 	TGB_RespType resp_type;
 	TGB_QUEUE_POP(&tgb.resp, &resp_type, TGB_MT_UNKNOWN);
 	return resp_type;
@@ -137,6 +146,7 @@ void TGBotSend(TGB_Msg msg) {
 	TGBotRespQueueAdd(TGB_MT_SEND_MESSAGE);
 	cJSON* msg_json = cJSON_CreateObject();
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", msg.chat_id)));
+	nob_temp_reset();
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", msg.text));
 	if (msg.is_markdown) {
 		NOB_ASSERT(cJSON_AddStringToObject(msg_json, "parse_mode", "Markdown"));
@@ -146,11 +156,14 @@ void TGBotSend(TGB_Msg msg) {
 		NOB_ASSERT(reply_markup = cJSON_Duplicate(msg.reply_markup, true));
 		NOB_ASSERT(cJSON_AddItemToObject(msg_json, "reply_markup", reply_markup));
 	}
-	char* msg_str = cJSON_PrintUnformatted(msg_json);
-	TGBotAPISendJSON("POST", "sendMessage", msg_str, strlen(msg_str));
-	cJSON_Delete(msg_json);
-	free(msg_str);
-	nob_temp_reset();
+	if (tgb.is_mocking) {
+		TGB_QUEUE_ADD(&tgb.mocking_q, msg_json);
+	} else {
+		char* msg_str = cJSON_PrintUnformatted(msg_json);
+		TGBotAPISendJSON("POST", "sendMessage", msg_str, strlen(msg_str));
+		free(msg_str);
+		cJSON_Delete(msg_json);
+	}
 }
 
 void TGBotSendText(uint64_t chat_id, char* text) {
