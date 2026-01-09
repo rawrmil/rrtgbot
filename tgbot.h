@@ -48,6 +48,7 @@ void TGBotClose();
 
 void TGBotSendText(uint64_t chat_id, char* text);
 void TGBotSendTextMD(uint64_t chat_id, char* text);
+void TGBotSendTextMDReplyMarkup(uint64_t chat_id, char* text, cJSON* reply_markup);
 
 #endif /* TGBOT_RW_H */
 
@@ -123,16 +124,22 @@ void TGBotSendGetUpdates() {
 typedef struct TGB_Msg {
 	int chat_id;
 	char* text;
+	cJSON* reply_markup;
 	unsigned is_markdown : 1;
 } TGB_Msg;
 
 void TGBotSend(TGB_Msg msg) {
 	TGBotRespQueueAdd(TGB_MT_SEND_MESSAGE);
-	cJSON *msg_json = cJSON_CreateObject();
+	cJSON* msg_json = cJSON_CreateObject();
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", msg.chat_id)));
 	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", msg.text));
 	if (msg.is_markdown) {
 		NOB_ASSERT(cJSON_AddStringToObject(msg_json, "parse_mode", "Markdown"));
+	}
+	if (msg.reply_markup) {
+		cJSON* reply_markup;
+		NOB_ASSERT(reply_markup = cJSON_Duplicate(msg.reply_markup, true));
+		NOB_ASSERT(cJSON_AddItemToObject(msg_json, "reply_markup", reply_markup));
 	}
 	char* msg_str = cJSON_PrintUnformatted(msg_json);
 	TGBotAPISendJSON("POST", "sendMessage", msg_str, strlen(msg_str));
@@ -147,6 +154,11 @@ void TGBotSendText(uint64_t chat_id, char* text) {
 
 void TGBotSendTextMD(uint64_t chat_id, char* text) {
 	TGBotSend((TGB_Msg){ .chat_id = chat_id, .text = text, .is_markdown = true });
+}
+
+void TGBotSendTextMDReplyMarkup(uint64_t chat_id, char* text, cJSON* reply_markup) {
+	TGBotSend((TGB_Msg){
+			.chat_id = chat_id, .text = text, .reply_markup = reply_markup, .is_markdown = true });
 }
 
 void TGBotPoll() {

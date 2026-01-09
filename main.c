@@ -93,10 +93,14 @@ TGB_Chat* TGBotGetChatById(int id) {
 	return NULL;
 }
 
+cJSON* rm_empty;
+cJSON* rm_exit;
+cJSON* rm_help;
+
 bool HandleUserCommand(TGB_Chat* chat, char* text) {
 	if (strcmp(text, "/echo") == 0) {
 		chat->mode = TGB_CM_ECHO;
-		TGBotSendText(chat->id, "Чтобы выйти напишите /exit");
+		TGBotSendTextMDReplyMarkup(chat->id, "Чтобы выйти напишите /exit", rm_exit);
 		//TGBotSendText(chat->id, "To exit echo mode type /exit");
 		return true;
 	}
@@ -113,11 +117,11 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 			//TGBotSendText(chat->id, "Wordle game internal error.");
 			return true;
 		}
-		TGBotSendText(chat->id, "Игра Вордл началась. Чтобы выйти напишите /exit");
+		TGBotSendTextMDReplyMarkup(chat->id, "Игра Вордл началась. Чтобы выйти напишите /exit", rm_exit);
 		//TGBotSendText(chat->id, "Wordle game started. To exit type /exit");
 		return true;
 	}
-	TGBotSendText(chat->id, "Неизвестная команда. Помощь: /help");
+	TGBotSendTextMDReplyMarkup(chat->id, "Неизвестная команда. Помощь: /help", rm_help);
 	//TGBotSendText(chat->id, "Unknown command.");
 	return false;
 }
@@ -165,11 +169,12 @@ void HandleUpdate(cJSON* update) {
 	MG_INFO(("update_id=%d\n", update_id, text));
 
 	if (!strcmp(text, "/start") || !strcmp(text, "/help")) {
-		TGBotSendText(chat_id,
+		TGBotSendTextMDReplyMarkup(chat->id,
 				"/help - помощь\n"
 				"/wordle - Вордл (угадай слово из пяти букв)\n"
 				"/echo - режим эхо\n"
-				"/foo - для теста кароч");
+				"/foo - для теста кароч",
+				rm_help);
 		HandleCommandExit(chat);
 		return;
 	}
@@ -177,7 +182,7 @@ void HandleUpdate(cJSON* update) {
 	if (chat->mode == TGB_CM_DEFAULT) {
 		if (text[0] == '/') { HandleUserCommand(chat, text); }
 		else {
-			TGBotSendText(chat->id, "Команды начинаяются с '/'. Помощь: /help");
+			TGBotSendTextMDReplyMarkup(chat->id, "Команды начинаяются с '/'. Помощь: /help", rm_help);
 			//TGBotSendText(chat->id, "Commands start '/'.");
 		}
 		return;
@@ -209,6 +214,14 @@ void app_terminate(int sig) {
 }
 
 int main(int argc, char* argv[]) {
+	rm_empty = cJSON_Parse("{}");
+	rm_exit = cJSON_Parse("{\"keyboard\":[[\"/exit\"]],\"resize_keyboard\":true}");
+	rm_help = cJSON_Parse(
+			"{\"keyboard\":["
+				"[\"/help\",\"/wordle\"],"
+				"[\"/echo\",\"/foo\"]"
+			"],\"resize_keyboard\":true}");
+
 	srand(nob_nanos_since_unspecified_epoch());
 
 	WordleInitWords();
@@ -238,6 +251,9 @@ int main(int argc, char* argv[]) {
 	mg_mgr_free(&mgr);
 	printf("Server closed.\n");
 	nob_da_free(wordle_words);
+	cJSON_Delete(rm_empty);
+	cJSON_Delete(rm_exit);
+	cJSON_Delete(rm_help);
 
 	return 0;
 }
