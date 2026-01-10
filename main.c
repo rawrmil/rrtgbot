@@ -53,7 +53,7 @@ void RandomBytes(void *buf, size_t len) {
 // --- APP ---
 
 struct Flags {
-	bool* tests_mode;
+	uint64_t* tests_mode;
 } flags;
 
 void FlagsParse(int argc, char** argv) {
@@ -61,7 +61,7 @@ void FlagsParse(int argc, char** argv) {
 
 	bool* f_help = flag_bool("help", 0, "help");
 	uint64_t* f_ll = flag_uint64("log-level", 0, "none, error, info, debug, verbose (0, 1, 2, 3, 4)");
-	flags.tests_mode = flag_bool("tests-mode", false, "run tests mode");
+	flags.tests_mode = flag_uint64("tests-mode", 0, "0 - no tests, 1 - tests and exit, 2 - tests and open server");
 
 	if (!flag_parse(argc, argv)) {
     flag_print_options(stdout);
@@ -123,7 +123,7 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 	}
 	if (strcmp(text, "/wordle") == 0) {
 		chat->mode = TGB_CM_WORDLE;
-		chat->mode_data = WordleInit();
+		chat->mode_data = WordleInit(chat->id);
 		if (chat->mode_data == NULL) {
 			TGBotSendText(chat->id, "Внутренняя ошибка Вордл.");
 			//TGBotSendText(chat->id, "Wordle game internal error.");
@@ -240,11 +240,13 @@ int main(int argc, char* argv[]) {
 
 	srand(nob_nanos_since_unspecified_epoch());
 
-	WordleInitWords();
+	WordleInitGame();
 	FlagsParse(argc, argv);
-	if (*flags.tests_mode) {
+	if (*flags.tests_mode != 0) {
+		tgb.is_mocking = true;
 		Tests();
-		return 0;
+		tgb.is_mocking = false;
+		if (*flags.tests_mode == 1) { return 0; }
 	}
 
 	NOB_ASSERT(nob_mkdir_if_not_exists("dbs"));
@@ -269,7 +271,7 @@ int main(int argc, char* argv[]) {
 	// Closing
 	mg_mgr_free(&mgr);
 	printf("Server closed.\n");
-	nob_da_free(wordle_words);
+	WordleCloseGame();
 	cJSON_Delete(rm_empty);
 	cJSON_Delete(rm_exit);
 	cJSON_Delete(rm_help);

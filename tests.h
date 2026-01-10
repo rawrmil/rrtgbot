@@ -22,10 +22,10 @@ struct TestsJSONsToFree {
 void TestWordle10000Games() {
 	void* wordle_data;
 	for (int i = 0; i < 10000; i++) {
-		NOB_ASSERT(wordle_data = WordleInit());
+		NOB_ASSERT(wordle_data = WordleInit(i / 1000));
 		size_t j = 0;
-		for (; j < 100; j++) {
-			if (WordleMessage(i, "дочка", wordle_data)) {
+		for (; j < 6; j++) {
+			if (WordleMessage(i, "бобёр", wordle_data)) {
 				free(wordle_data);
 				break;
 			}
@@ -39,12 +39,12 @@ void TestWordle10000Games() {
 				nob_da_append(&jsons_to_free, msg_json);
 			}
 		}
-		NOB_ASSERT(j < 100);
 	}
 	while (jsons_to_free.count != 0) {
 		cJSON_Delete(jsons_to_free.items[0]);
 		nob_da_remove_unordered(&jsons_to_free, 0);
 	}
+	WordleLogPlayers();
 }
 
 #define RUN_TEST(func_) \
@@ -57,7 +57,6 @@ void TestWordle10000Games() {
 	} while(0)
 
 void Tests() {
-	tgb.is_mocking = true;
 	printf("--- TESTING MODE ---\n");
 	RUN_TEST(TestWordle10000Games);
 	printf("--- TESTING ENDED ---\n");

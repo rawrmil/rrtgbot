@@ -8,14 +8,26 @@
 typedef struct Wordle {
 	uint8_t word_index;
 	uint8_t word[5];
-	uint8_t words[40]; // 5 * 8
-	uint8_t tiles[40]; // 5 * 8
+	uint8_t words[30]; // 5 * 6
+	uint8_t tiles[30]; // 5 * 6
 	uint8_t tried[33];
+	size_t player_index;
 	// 0 - unknown
 	// 1 - letter doesn't exist
 	// 2 - letter does exist
 	// 3 - letter exists in this place
 } Wordle;
+
+typedef struct WordlePlayer {
+	int chat_id;
+	uint32_t score;
+} WordlePlayer;
+
+typedef struct WordlePlayers {
+	WordlePlayer* items;
+	size_t count;
+	size_t capacity;
+} WordlePlayers;
 
 typedef struct WordleWord {
 	uint8_t difficulty;
@@ -34,6 +46,7 @@ typedef struct WordleWords {
 } WordleWords;
 
 extern WordleWords wordle_words;
+extern WordlePlayers wordle_players;
 
 void* WordleInit();
 void WordleInitWords();
@@ -108,6 +121,7 @@ bool ut8cptosb(Nob_String_Builder* sb, uint32_t cp) {
 }
 
 WordleWords wordle_words;
+WordlePlayers wordle_players;
 
 uint8_t WordleCPToRuCode(uint32_t cp) {
 	if (cp == (uint32_t)-1) { return (uint8_t)-1; }
@@ -125,7 +139,28 @@ uint32_t WordleRuCodeToCP(uint8_t rc) {
 	return 0x451;
 }
 
-void* WordleInit() {
+size_t WordleGetPlayerIndex(int chat_id) {
+	for (size_t i = 0; i < wordle_players.count; i++) {
+		WordlePlayer* p = &wordle_players.items[i];
+		if (p->chat_id == chat_id) { return i; }
+	}
+	return (size_t)-1;
+}
+
+void WordleLogPlayers() {
+	Nob_String_Builder sb = {0};
+	for (size_t i = 0; i < 100; i++) {
+		if (i >= wordle_players.count) { break; }
+		WordlePlayer* p = &wordle_players.items[i];
+		nob_sb_appendf(&sb, "%d>%lu, ", p->chat_id, p->score);
+	}
+	nob_da_append(&sb, '\n');
+	nob_sb_append_null(&sb);
+	MG_INFO(("%.*s", sb.count, sb.items));
+	nob_sb_free(sb);
+}
+
+void* WordleInit(int chat_id) {
 	Wordle* wordle = calloc(1, sizeof(*wordle));
 	if (wordle_words.count == 0) { return NULL; }
 	Nob_String_Builder sb = {0};
@@ -140,6 +175,19 @@ void* WordleInit() {
 		}
 	}
 	MG_INFO(("WORD: %.*s\n", (int)sb.count, sb.items));
+	size_t pi = WordleGetPlayerIndex(chat_id);
+	if (pi == (size_t)-1) {
+		WordlePlayer p = {0};
+		p.chat_id = chat_id;
+		nob_da_append(&wordle_players, p);
+		pi = wordle_players.count - 1;
+	}
+	WordlePlayer* p = &wordle_players.items[pi];
+	wordle->player_index = pi;
+	sb.count = 0;
+	nob_sb_appendf(&sb, "Твоё место в рейтинге: %zu. Твой счёт: %ld", pi + 1, p->score);
+	nob_sb_append_null(&sb);
+	TGBotSendText(chat_id, sb.items);
 	nob_sb_free(sb);
 	return (void*)wordle;
 }
@@ -188,6 +236,17 @@ defer:
 	nob_sb_append_null(&sb);
 	printf("Wordle words loaded:%.*s\n", (int)sb.count, sb.items);
 	nob_sb_free(sb);
+}
+
+void WordleInitGame() {
+	WordleInitWords();
+	// TODO: load player data
+}
+
+void WordleCloseGame() {
+	// TODO: save player data
+	nob_da_free(wordle_words);
+	nob_da_free(wordle_players);
 }
 
 void WordleAppendTile(Nob_String_Builder* sb, uint8_t t) {
@@ -307,6 +366,16 @@ void WordleSendGuessedRight(int chat_id, Wordle* wordle) {
 	nob_sb_appendf(&sb, "'");
 	nob_sb_append_null(&sb);
 	TGBotSendTextMD(chat_id, sb.items);
+	wordle_players.items[wordle->player_index].score += 1;
+	for (size_t i = wordle->player_index; i != 0; i--) {
+		WordlePlayer* p1 = &wordle_players.items[i];
+		WordlePlayer* p2 = &wordle_players.items[i - 1];
+		if (p1->score > p2->score) {
+			WordlePlayer tmp = *p1;
+			*p1 = *p2;
+			*p2 = tmp;
+		}
+	}
 	nob_sb_free(sb);
 }
 
