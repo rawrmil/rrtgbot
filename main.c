@@ -139,14 +139,29 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 
 void HandleCommandExit(TGB_Chat* chat) {
 	switch (chat->mode) {
-		case TGB_CM_ECHO: TGBotSendText(chat->id, "Выход из '/echo'."); break;
-		//case TGB_CM_ECHO: TGBotSendText(chat->id, "Exited echo."); break;
-		case TGB_CM_WORDLE: TGBotSendText(chat->id, "Выход из Вордла."); break;
-		//case TGB_CM_WORDLE: TGBotSendText(chat->id, "Exited Wordle."); break;
+		case TGB_CM_ECHO:
+			TGBotSendTextMDReplyMarkup(chat->id, "Выход из режима 'эхо'.", rm_help);
+			//case TGB_CM_ECHO: TGBotSendText(chat->id, "Exited echo.");
+			break;
+		case TGB_CM_WORDLE:
+			TGBotSendTextMDReplyMarkup(chat->id, "Выход из Вордла.", rm_help);
+			//case TGB_CM_WORDLE: TGBotSendText(chat->id, "Exited Wordle.");
+			break;
 	}
 	free(chat->mode_data);
 	chat->mode_data = NULL;
 	chat->mode = TGB_CM_DEFAULT;
+}
+
+void HandleCommand(TGB_Chat* chat, char* text) {
+	switch (chat->mode) {
+		case TGB_CM_ECHO:
+			TGBotSendText(chat->id, text);
+			break;
+		case TGB_CM_WORDLE:
+			if (WordleMessage(chat->id, text, chat->mode_data)) { HandleCommandExit(chat); }
+			break;
+	}
 }
 
 void HandleUpdate(cJSON* update) {
@@ -201,14 +216,7 @@ void HandleUpdate(cJSON* update) {
 		return;
 	}
 
-	switch (chat->mode) {
-		case TGB_CM_ECHO:
-			TGBotSendText(chat_id, text);
-			break;
-		case TGB_CM_WORDLE:
-			if (WordleMessage(chat_id, text, chat->mode_data)) { HandleCommandExit(chat); }
-			break;
-	}
+	HandleCommand(chat, text);
 }
 
 // --- MAIN ---
