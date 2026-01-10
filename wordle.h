@@ -240,11 +240,37 @@ defer:
 
 void WordleInitGame() {
 	WordleInitWords();
-	// TODO: load player data
+	if (nob_file_exists("dbs/tgb_wordle")) {
+		Nob_String_Builder sb = {0};
+		NOB_ASSERT(nob_read_entire_file("dbs/tgb_wordle", &sb));
+		BReader br = {0};
+		br.data = sb.items;
+		br.count = sb.count;
+		for (;;) {
+			WordlePlayer p = {0};
+			uint32_t chat_id;
+			NOB_ASSERT(BReadU32(&br, &chat_id));
+			p.chat_id = chat_id;
+			NOB_ASSERT(BReadU32(&br, &p.score));
+			uint8_t _[56]; // TODO: add skip function
+			BReadN(&br, _, 56); // Reserved
+			nob_da_append(&wordle_players, p);
+			if (br.count == 0) { break; }
+		}
+		nob_sb_free(sb);
+	}
 }
 
 void WordleCloseGame() {
-	// TODO: save player data
+	bw_temp.count = 0;
+	nob_da_foreach(WordlePlayer, p, &wordle_players) {
+		BWriteU32(&bw_temp, (uint32_t)p->chat_id);
+		BWriteU32(&bw_temp, (uint32_t)p->score);
+		for (size_t i = 0; i < 56; i++) {
+			BWriteU8(&bw_temp, 0); // TODO: binary_rw fill func
+		}
+	}
+	nob_write_entire_file("dbs/tgb_wordle", bw_temp.items, bw_temp.count);
 	nob_da_free(wordle_words);
 	nob_da_free(wordle_players);
 }

@@ -50,7 +50,7 @@ void BWriterFree(BWriter bw);
 
 #define BR_READ_OUT(type_, amount_) \
 	do { \
-		if (amount_ > br->count) \
+		if (amount_ > br->count || out == NULL) \
 			return false; \
 		memcpy(out, br->data, amount_); \
 		br->data += amount_; \
