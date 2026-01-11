@@ -22,7 +22,7 @@ struct TestsJSONsToFree {
 void TestWordle10000Games() {
 	void* wordle_data;
 	for (int i = 0; i < 10000; i++) {
-		NOB_ASSERT(wordle_data = WordleInit(i / 1000));
+		NOB_ASSERT(wordle_data = WordleInitSession(i / 1000));
 		size_t j = 0;
 		for (; j < 6; j++) {
 			if (WordleMessage(i, "бобёр", wordle_data)) {

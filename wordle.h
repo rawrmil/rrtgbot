@@ -48,7 +48,7 @@ typedef struct WordleWords {
 extern WordleWords wordle_words;
 extern WordlePlayers wordle_players;
 
-void* WordleInit();
+void* WordleInitSession();
 void WordleInitWords();
 bool WordleMessage(int chat_id, char* text, void* data);
 
@@ -160,7 +160,7 @@ void WordleLogPlayers() {
 	nob_sb_free(sb);
 }
 
-void* WordleInit(int chat_id) {
+void* WordleInitSession(int chat_id) {
 	Wordle* wordle = calloc(1, sizeof(*wordle));
 	if (wordle_words.count == 0) { return NULL; }
 	Nob_String_Builder sb = {0};
@@ -261,7 +261,7 @@ void WordleInitGame() {
 	}
 }
 
-void WordleCloseGame() {
+void WordleSaveGame() {
 	bw_temp.count = 0;
 	nob_da_foreach(WordlePlayer, p, &wordle_players) {
 		BWriteU32(&bw_temp, (uint32_t)p->chat_id);
@@ -271,6 +271,10 @@ void WordleCloseGame() {
 		}
 	}
 	nob_write_entire_file("dbs/tgb_wordle", bw_temp.items, bw_temp.count);
+}
+
+void WordleDeinitGame() {
+	WordleSaveGame();
 	nob_da_free(wordle_words);
 	nob_da_free(wordle_players);
 }

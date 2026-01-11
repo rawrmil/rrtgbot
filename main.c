@@ -123,7 +123,7 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 	}
 	if (strcmp(text, "/wordle") == 0) {
 		chat->mode = TGB_CM_WORDLE;
-		chat->mode_data = WordleInit(chat->id);
+		chat->mode_data = WordleInitSession(chat->id);
 		if (chat->mode_data == NULL) {
 			TGBotSendText(chat->id, "Внутренняя ошибка Вордл.");
 			//TGBotSendText(chat->id, "Wordle game internal error.");
@@ -271,7 +271,7 @@ int main(int argc, char* argv[]) {
 	// Closing
 	mg_mgr_free(&mgr);
 	printf("Server closed.\n");
-	WordleCloseGame();
+	WordleDeinitGame();
 	cJSON_Delete(rm_empty);
 	cJSON_Delete(rm_exit);
 	cJSON_Delete(rm_help);
