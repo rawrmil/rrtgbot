@@ -5,6 +5,8 @@
 #include "wchar.h"
 #include "mongoose/mongoose.h"
 
+#define MIN(_a, _b) ((_a) < (_b) ? (_a) : (_b))
+
 typedef struct Wordle {
 	uint8_t word_index;
 	uint8_t word[5];
@@ -149,8 +151,7 @@ size_t WordleGetPlayerIndex(int chat_id) {
 
 void WordleLogPlayers() {
 	Nob_String_Builder sb = {0};
-	for (size_t i = 0; i < 100; i++) {
-		if (i >= wordle_players.count) { break; }
+	for (size_t i = 0; i < MIN(100, wordle_players.count); i++) {
 		WordlePlayer* p = &wordle_players.items[i];
 		nob_sb_appendf(&sb, "%d>%lu, ", p->chat_id, p->score);
 	}
@@ -185,7 +186,16 @@ void* WordleInitSession(int chat_id) {
 	WordlePlayer* p = &wordle_players.items[pi];
 	wordle->player_index = pi;
 	sb.count = 0;
-	nob_sb_appendf(&sb, "Твоё место в рейтинге: %zu. Твой счёт: %ld", pi + 1, p->score);
+	//nob_sb_appendf(&sb, "Твоё место в рейтинге: %zu. Твой счёт: %ld", pi + 1, p->score);
+	nob_sb_appendf(&sb, "Лидерборд:\n");
+	for (size_t i = 0; i < MIN(10, wordle_players.count); i++) {
+		WordlePlayer* p = &wordle_players.items[i];
+		nob_sb_appendf(&sb, "%zu: %d (%lu)%s\n", i + 1, p->chat_id, p->score, (p->chat_id != chat_id ? "" : " <- ты"));
+	}
+	if (pi > 10) { nob_sb_appendf(&sb, "...\n"); }
+	if (pi > 9) {
+		nob_sb_appendf(&sb, "%zu: %d (%lu) <- ты", pi + 1, chat_id, p->score);
+	}
 	nob_sb_append_null(&sb);
 	TGBotSendText(chat_id, sb.items);
 	nob_sb_free(sb);

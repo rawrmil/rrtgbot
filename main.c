@@ -181,7 +181,10 @@ void HandleUpdate(cJSON* update) {
 	if (!cJSON_IsObject(chat_json)) { return; }
 	cJSON* chat_id_json = cJSON_GetObjectItemCaseSensitive(chat_json, "id");
 	if (!cJSON_IsNumber(chat_id_json)) { return; }
+	cJSON* chat_username_json = cJSON_GetObjectItemCaseSensitive(chat_json, "username");
+	if (!cJSON_IsString(chat_username_json)) { return; }
 	int chat_id = chat_id_json->valueint;
+	char* username = chat_username_json->valuestring;
 
 	TGB_Chat* chat = TGBotGetChatById(chat_id);
 	if (chat == NULL) {
