@@ -32,7 +32,7 @@ typedef struct TGB_RespQueue {
 } TGB_RespQueue;
 
 typedef struct TGB_MockingQueue {
-	cJSON* buf[TGB_QUEUE_CAPACITY]; // TODO: custom size frfr
+	char* buf[TGB_QUEUE_CAPACITY]; // TODO: custom size frfr
 	size_t head, tail;
 } TGB_MockingQueue;
 
@@ -46,6 +46,7 @@ typedef struct TGB_Bot {
 	uint64_t last_poll_ms;
 	uint64_t update_offset;
 	TGB_RespQueue resp;
+	Nob_String_Builder sb_temp;
 } TGB_Bot;
 
 extern TGB_Bot tgb;
@@ -56,7 +57,7 @@ void TGBotClose();
 
 void TGBotSendText(uint64_t chat_id, char* text);
 void TGBotSendTextMD(uint64_t chat_id, char* text);
-void TGBotSendTextMDReplyMarkup(uint64_t chat_id, char* text, cJSON* reply_markup);
+void TGBotSendTextMDReplyMarkup(uint64_t chat_id, char* text, char* reply_markup);
 
 #endif /* TGBOT_H */
 
@@ -70,9 +71,9 @@ TGB_Bot tgb; // TODO: multiple bots option
 
 void TGBotAPISendJSON(char* method, char* action, char* buf, size_t len) {
 	if (!tgb.is_connected) {
+		return;
 		MG_ERROR(("tgbot disconnected, connecting..."));
 		for (size_t i = 0; i < 3; i++) { mg_mgr_poll(tgb.mgr, 1000); }
-		return;
 	}
 	char* msg = nob_temp_sprintf(
 			"%s /bot"TGBOT_API_TOKEN"/%s HTTP/1.1\r\n"
@@ -138,31 +139,52 @@ void TGBotSendGetUpdates() {
 typedef struct TGB_Msg {
 	int chat_id;
 	char* text;
-	cJSON* reply_markup;
+	char* reply_markup;
 	unsigned is_markdown : 1;
 } TGB_Msg;
 
+void TGBotJSONEscapeAppend(Nob_String_Builder* sb, char* str) {
+	for (char* p = str; *p; p++) {
+		switch (*p) {
+			case '\"': nob_sb_append_cstr(sb, "\\\""); break;
+			case '\\': nob_sb_append_cstr(sb, "\\\\"); break;
+			case '\b': nob_sb_append_cstr(sb, "\\b");  break;
+			case '\f': nob_sb_append_cstr(sb, "\\f");  break;
+			case '\n': nob_sb_append_cstr(sb, "\\n");  break;
+			case '\r': nob_sb_append_cstr(sb, "\\r");  break;
+			case '\t': nob_sb_append_cstr(sb, "\\t");  break;
+			default: nob_da_append(sb, *p); break;
+		}
+	}
+}
+
 void TGBotSend(TGB_Msg msg) {
+	Nob_String_Builder* sb = &tgb.sb_temp;
+	sb->count = 0;
 	TGBotRespQueueAdd(TGB_MT_SEND_MESSAGE);
-	cJSON* msg_json = cJSON_CreateObject();
-	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "chat_id", nob_temp_sprintf("%lu", msg.chat_id)));
+	//cJSON* msg_json = cJSON_CreateObject();
+	nob_sb_append_cstr(sb, "{\"chat_id\":\"");
+	nob_sb_append_cstr(sb, nob_temp_sprintf("%lu", msg.chat_id));
 	nob_temp_reset();
-	NOB_ASSERT(cJSON_AddStringToObject(msg_json, "text", msg.text));
+	nob_sb_append_cstr(sb, "\",");
+	nob_sb_append_cstr(sb, "\"text\":\"");
+	TGBotJSONEscapeAppend(sb, msg.text);
+	nob_sb_append_cstr(sb, "\",");
 	if (msg.is_markdown) {
-		NOB_ASSERT(cJSON_AddStringToObject(msg_json, "parse_mode", "Markdown"));
+		nob_sb_append_cstr(sb, "\"parse_mode\":\"Markdown\",");
 	}
 	if (msg.reply_markup) {
-		cJSON* reply_markup;
-		NOB_ASSERT(reply_markup = cJSON_Duplicate(msg.reply_markup, true));
-		NOB_ASSERT(cJSON_AddItemToObject(msg_json, "reply_markup", reply_markup));
+		nob_sb_append_cstr(sb, "\"reply_markup\":");
+		nob_sb_append_cstr(sb, msg.reply_markup);
+		nob_sb_append_cstr(sb, ",");
 	}
+	sb->items[sb->count - 1] = '}';
 	if (tgb.is_mocking) {
-		TGB_QUEUE_ADD(&tgb.mocking_q, msg_json);
+		//TGB_QUEUE_ADD(&tgb.mocking_q, sb.items);
 	} else {
-		char* msg_str = cJSON_PrintUnformatted(msg_json);
-		TGBotAPISendJSON("POST", "sendMessage", msg_str, strlen(msg_str));
-		free(msg_str);
-		cJSON_Delete(msg_json);
+		//printf("sent>>>"SV_Fmt"<<<\n", SV_Arg(nob_sb_to_sv(sb)));
+		TGBotAPISendJSON("POST", "sendMessage", sb->items, sb->count);
+		//nob_sb_free(sb);
 	}
 }
 
@@ -174,7 +196,7 @@ void TGBotSendTextMD(uint64_t chat_id, char* text) {
 	TGBotSend((TGB_Msg){ .chat_id = chat_id, .text = text, .is_markdown = true });
 }
 
-void TGBotSendTextMDReplyMarkup(uint64_t chat_id, char* text, cJSON* reply_markup) {
+void TGBotSendTextMDReplyMarkup(uint64_t chat_id, char* text, char* reply_markup) {
 	TGBotSend((TGB_Msg){
 			.chat_id = chat_id, .text = text, .reply_markup = reply_markup, .is_markdown = true });
 }
@@ -308,6 +330,7 @@ void TGBotClose() {
 	for (size_t i = 0; i < 3; i++) {
 		mg_mgr_poll(tgb.mgr, 1000);
 	}
+	nob_sb_free(tgb.sb_temp);
 	// Save state
 	bw_temp.count = 0;
 	BWriteU64(&bw_temp, tgb.update_offset);

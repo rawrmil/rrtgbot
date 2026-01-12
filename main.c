@@ -100,9 +100,13 @@ TGB_Chat* TGBotGetChatById(int id) {
 	return NULL;
 }
 
-cJSON* rm_empty;
-cJSON* rm_exit;
-cJSON* rm_help;
+char rm_empty[] = "{}";
+char rm_exit[] = "{\"keyboard\":[[\"/exit\"]],\"resize_keyboard\":true}";
+char rm_help[] =
+			"{\"keyboard\":["
+				"[\"/help\",\"/wordle\"],"
+				"[\"/echo\",\"/foo\"]"
+			"],\"resize_keyboard\":true}";
 
 void HandleUserUnknownCommandMessage(TGB_Chat* chat) {
 	TGBotSendTextMDReplyMarkup(chat->id, "Неизвестная команда. Помощь: /help", rm_help);
@@ -233,13 +237,6 @@ void app_terminate(int sig) {
 }
 
 int main(int argc, char* argv[]) {
-	rm_empty = cJSON_Parse("{}");
-	rm_exit = cJSON_Parse("{\"keyboard\":[[\"/exit\"]],\"resize_keyboard\":true}");
-	rm_help = cJSON_Parse(
-			"{\"keyboard\":["
-				"[\"/help\",\"/wordle\"],"
-				"[\"/echo\",\"/foo\"]"
-			"],\"resize_keyboard\":true}");
 
 	srand(nob_nanos_since_unspecified_epoch());
 
@@ -275,9 +272,6 @@ int main(int argc, char* argv[]) {
 	mg_mgr_free(&mgr);
 	printf("Server closed.\n");
 	WordleDeinitGame();
-	cJSON_Delete(rm_empty);
-	cJSON_Delete(rm_exit);
-	cJSON_Delete(rm_help);
 
 	return 0;
 }

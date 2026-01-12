@@ -13,11 +13,11 @@ void Tests();
 
 uint64_t timer;
 
-struct TestsJSONsToFree {
-	cJSON** items;
+struct TestsVoidsToFree {
+	void** items;
 	size_t count;
 	size_t capacity;
-} jsons_to_free;
+} voids_to_free;
 
 void TestWordle10000Games() {
 	void* wordle_data;
@@ -31,20 +31,17 @@ void TestWordle10000Games() {
 				free(wordle_data);
 				break;
 			}
-			for (cJSON* msg_json = NULL;;) {
-				TGB_QUEUE_POP(&tgb.mocking_q, &msg_json, NULL);
-				if (msg_json == NULL) { break; }
-				//char* msg = cJSON_PrintUnformatted(msg_json);
+			for (char* msg = NULL;;) {
+				TGB_QUEUE_POP(&tgb.mocking_q, &msg, NULL);
+				if (msg == NULL) { break; }
 				//printf("%s\n", msg);
-				//free(msg);
-				//cJSON_Delete(msg_json);
-				nob_da_append(&jsons_to_free, msg_json);
+				nob_da_append(&voids_to_free, msg);
 			}
 		}
 	}
-	while (jsons_to_free.count != 0) {
-		cJSON_Delete(jsons_to_free.items[0]);
-		nob_da_remove_unordered(&jsons_to_free, 0);
+	while (voids_to_free.count != 0) {
+		free(voids_to_free.items[0]);
+		nob_da_remove_unordered(&voids_to_free, 0);
 	}
 	WordleLogPlayers();
 }
