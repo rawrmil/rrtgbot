@@ -44,6 +44,11 @@ char rm_help[] =
 				"[\"/help\",\"/wordle\"],"
 				"[\"/echo\",\"/foo\"]"
 			"],\"resize_keyboard\":true}";
+char rm_wordle[] =
+			"{\"keyboard\":["
+				"[\"/wordle_play\",\"/wordle_name\"],"
+				"[\"/wordle_board\"]"
+			"],\"resize_keyboard\":true}";
 
 void HandleUserUnknownCommandMessage(TGB_Chat* chat) {
 	TGBotSendTextMDReplyMarkup(chat->id, "Неизвестная команда. Помощь: /help", rm_help);
@@ -63,6 +68,22 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 		return true;
 	}
 	if (strcmp(text, "/wordle") == 0) {
+		TGBotSendTextMDReplyMarkup(chat->id,
+				"/wordle\\_play - играть\n"
+				"/wordle\\_name <имя> - поменять ник (латинские, цифры, 15 символов максимум)\n"
+				"/wordle\\_board- лидероборд\n",
+				rm_wordle);
+		return true;
+	}
+	if (strcmp(text, "/wordle_name") == 0) {
+		//WordleNickname(chat->id, text);
+		return true;
+	}
+	if (strcmp(text, "/wordle_board") == 0) {
+		WordleLeaderboard(chat->id);
+		return true;
+	}
+	if (strcmp(text, "/wordle_play") == 0) {
 		chat->mode = TGB_CM_WORDLE;
 		chat->mode_data = WordleInitSession(chat->id);
 		if (chat->mode_data == NULL) {
