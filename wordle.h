@@ -367,19 +367,29 @@ bool WordleWordExist(Wordle* wordle) {
 
 bool WordleFillTiles(Wordle* wordle) {
 	bool all_match = true;
+	uint8_t lkp[33] = {0};
+	for (size_t i = 0; i < 5; i++) {
+		uint8_t rc = wordle->word[i];
+		if (rc > 32) { return false; }
+		lkp[rc]++;
+	}
 	for (size_t i = 0; i < 5; i++) {
 		uint8_t rc = wordle->words[wordle->word_index * 5 + i];
-		//if (rc > 32) { NOB_UNREACHABLE("rc > 32"); }
+		if (rc > 32) { return false; }
 		wordle->tiles[wordle->word_index * 5 + i] = 1;
 		if (rc == wordle->word[i]) {
 			wordle->tiles[wordle->word_index * 5 + i] = 3;
-		} else {
+			lkp[rc]--;
+		}
+	}
+	for (size_t i = 0; i < 5; i++) {
+		uint8_t rc = wordle->words[wordle->word_index * 5 + i];
+		if (rc > 32) { return false; }
+		if (rc != wordle->word[i]) {
 			all_match = false;
-			for (size_t j = 0; j < 5; j++) {
-				if (rc == wordle->word[j]) {
-					wordle->tiles[wordle->word_index * 5 + i] = 2;
-					break;
-				}
+			if (lkp[rc] > 0) {
+				wordle->tiles[wordle->word_index * 5 + i] = 2;
+				lkp[rc]--;
 			}
 		}
 		uint8_t tile_status = wordle->tiles[wordle->word_index * 5 + i];
