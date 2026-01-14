@@ -46,8 +46,7 @@ char rm_help[] =
 			"],\"resize_keyboard\":true}";
 char rm_wordle[] =
 			"{\"keyboard\":["
-				"[\"/wordle_play\",\"/wordle_name\"],"
-				"[\"/wordle_board\"]"
+				"[\"/wordle_play\"],[\"/wordle_board\"],[\"/wordle_name\"]"
 			"],\"resize_keyboard\":true}";
 
 void HandleUserUnknownCommandMessage(TGB_Chat* chat) {
@@ -70,13 +69,16 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 	if (strcmp(text, "/wordle") == 0) {
 		TGBotSendTextMDReplyMarkup(chat->id,
 				"/wordle\\_play - играть\n"
-				"/wordle\\_name <имя> - поменять ник (латинские, цифры, 15 символов максимум)\n"
-				"/wordle\\_board- лидероборд\n",
+				"/wordle\\_board - лидерборд\n"
+				"/wordle\\_name  - поменять ник\n",
 				rm_wordle);
 		return true;
 	}
 	if (strcmp(text, "/wordle_name") == 0) {
-		//WordleNickname(chat->id, text);
+		chat->mode = TGB_CM_WORDLE_NAME;
+		TGBotSendTextMDReplyMarkup(chat->id,
+				"Введи ник (латинские буквы, цифры, 5 символов максимум, отмена /exit):",
+				rm_exit);
 		return true;
 	}
 	if (strcmp(text, "/wordle_board") == 0) {
@@ -84,7 +86,7 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 		return true;
 	}
 	if (strcmp(text, "/wordle_play") == 0) {
-		chat->mode = TGB_CM_WORDLE;
+		chat->mode = TGB_CM_WORDLE_PLAY;
 		chat->mode_data = WordleInitSession(chat->id);
 		if (chat->mode_data == NULL) {
 			TGBotSendText(chat->id, "Внутренняя ошибка Вордл.");
@@ -105,9 +107,12 @@ void HandleCommandExit(TGB_Chat* chat) {
 			TGBotSendTextMDReplyMarkup(chat->id, "Выход из режима 'эхо'.", rm_help);
 			//case TGB_CM_ECHO: TGBotSendText(chat->id, "Exited echo.");
 			break;
-		case TGB_CM_WORDLE:
+		case TGB_CM_WORDLE_PLAY:
 			TGBotSendTextMDReplyMarkup(chat->id, "Выход из Вордла.", rm_help);
-			//case TGB_CM_WORDLE: TGBotSendText(chat->id, "Exited Wordle.");
+			//TGBotSendText(chat->id, "Exited Wordle.");
+			break;
+		case TGB_CM_WORDLE_NAME:
+			TGBotSendTextMDReplyMarkup(chat->id, "Выход из изменения имени.", rm_wordle);
 			break;
 	}
 	free(chat->mode_data);
@@ -120,8 +125,16 @@ void HandleCommand(TGB_Chat* chat, char* text) {
 		case TGB_CM_ECHO:
 			TGBotSendText(chat->id, text);
 			break;
-		case TGB_CM_WORDLE:
+		case TGB_CM_WORDLE_PLAY:
 			if (WordleMessage(chat->id, text, chat->mode_data)) { HandleCommandExit(chat); }
+			break;
+		case TGB_CM_WORDLE_NAME:
+			if (WordleNickname(chat->id, text)) {
+				TGBotSendTextMDReplyMarkup(chat->id, "Ник обновлен.", rm_wordle);
+				HandleCommandExit(chat);
+				break;
+			}
+			TGBotSendTextMDReplyMarkup(chat->id, "Ник НЕ обновлен, проверь правильность.", rm_exit);
 			break;
 	}
 }

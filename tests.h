@@ -23,7 +23,7 @@ void TestWordle10000Games() {
 	void* wordle_data;
 	for (int i = 0; i < 10000; i++) {
 		int pi = i / 1000;
-		//NOB_ASSERT(WordleNickname(pi, nob_temp_sprintf("test%d", i)));
+		NOB_ASSERT(WordleNickname(pi, nob_temp_sprintf("test%d", pi)));
 		NOB_ASSERT(wordle_data = WordleInitSession(pi));
 		nob_temp_reset();
 		size_t j = 0;
