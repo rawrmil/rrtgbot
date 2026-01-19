@@ -46,7 +46,10 @@ char rm_help[] =
 			"],\"resize_keyboard\":true}";
 char rm_wordle[] =
 			"{\"keyboard\":["
-				"[\"/wordle_play\"],[\"/wordle_board\"],[\"/wordle_name\"]"
+				"[\"/wordle_play\"],"
+				"[\"/wordle_board\"],"
+				"[\"/wordle_name\"],"
+				"[\"/exit\"]"
 			"],\"resize_keyboard\":true}";
 
 void HandleUserUnknownCommandMessage(TGB_Chat* chat) {
@@ -70,7 +73,8 @@ bool HandleUserCommand(TGB_Chat* chat, char* text) {
 		TGBotSendTextMDReplyMarkup(chat->id,
 				"/wordle\\_play - играть\n"
 				"/wordle\\_board - лидерборд\n"
-				"/wordle\\_name  - поменять ник\n",
+				"/wordle\\_name  - поменять ник\n"
+				"/exit - выйти в основное меню\n",
 				rm_wordle);
 		return true;
 	}
@@ -172,7 +176,7 @@ void HandleUpdate(cJSON* update) {
 
 	MG_INFO(("update_id=%d\n", update_id, text));
 
-	if (!strcmp(text, "/start") || !strcmp(text, "/help")) {
+	if (!strcmp(text, "/start") || !strcmp(text, "/help") || !strcmp(text, "/exit")) {
 		TGBotSendTextMDReplyMarkup(chat->id,
 				"/help - помощь\n"
 				"/wordle - Вордл (угадай слово из пяти букв)\n"
