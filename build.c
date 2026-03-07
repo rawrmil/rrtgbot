@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
 	}
 
 	cmd_append(&cmd,
-			"cc", "main.c", "3rd_party/cJSON/cJSON.c", "-o", "out/rrtgbot",
+			"cc", "main.c", "3rd_party/cJSON/cJSON.c", "-o", "out/r4tgb",
 			"out/mongoose.o",
 			"-I./3rd_party");
 	if (*flags.sanitize) { cmd_append(&cmd, "-fsanitize=address,undefined"); }

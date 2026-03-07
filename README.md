@@ -18,7 +18,7 @@ Download /resources directory and place to the root of the repo
 # Only 1 time:
 gcc build.c -o build
 ./build
-./out/rrtgbot
+./out/r4tgb
 ```
 3. Delete `dbs/tgb_update_offset` if no responses
 
