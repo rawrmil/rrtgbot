@@ -232,7 +232,7 @@ bool WordleLeaderboard(int chat_id) {
 void WordleInitWords() {
 	bool result = true;
 	Nob_String_Builder fdata = {0};
-	nob_read_entire_file("resources/wordle_bank.txt", &fdata);
+	nob_read_entire_file("wordle/bank.txt", &fdata);
 	WordleWord curr = {0};
 	size_t index = 0;
 	for (size_t i = 0; i < fdata.count; ) {
