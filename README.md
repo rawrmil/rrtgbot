@@ -20,6 +20,7 @@ gcc build.c -o build
 ./build
 ./out/rrtgbot
 ```
+3. Delete `dbs/tgb_update_offset` if no responses
 
 ## Additional build flags:
 ```sh
