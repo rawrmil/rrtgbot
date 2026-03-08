@@ -274,7 +274,7 @@ void TGBotEventHandler(struct mg_connection* c, int ev, void* ev_data) {
 		case MG_EV_TLS_HS:
 			MG_INFO(("HANDSHAKE\n"));
 			tgb.is_connected = true;
-			TGBotSendText(TGBOT_ADMIN_CHAT_ID, "Server started.");
+			//TGBotSendText(TGBOT_ADMIN_CHAT_ID, "Server started.");
 			TGBotSendGetWebhookInfo();
 #ifdef TGBOT_WEBHOOK_URL
 			TGBotSendSetWebhook();
